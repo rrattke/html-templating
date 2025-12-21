@@ -3,7 +3,7 @@ import { html } from '../template/html.js';
 import { instantiate } from '../template/instantiate.js';
 
 export abstract class ReactiveElement extends HTMLElement {
-  private dispose: (() => void) | null = null;
+  #dispose: (() => void) | null = null;
 
   protected template(): TemplateResult {
     return html``;
@@ -14,8 +14,8 @@ export abstract class ReactiveElement extends HTMLElement {
   }
 
   disconnectedCallback(): void {
-    this.dispose?.();
-    this.dispose = null;
+    this.#dispose?.();
+    this.#dispose = null;
   }
 
   protected render(): void {
@@ -23,9 +23,9 @@ export abstract class ReactiveElement extends HTMLElement {
     if (!result) {
       return;
     }
-    this.dispose?.();
+    this.#dispose?.();
     const { fragment, dispose } = instantiate(result);
-    this.dispose = dispose;
+    this.#dispose = dispose;
     const root = this.shadowRoot ?? this.attachShadow({ mode: 'open' });
     root.replaceChildren(fragment);
   }
