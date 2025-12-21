@@ -1,4 +1,4 @@
-import { createSignal, html, ReactiveElement } from '@vanishing/framework';
+import { createSignal, html, ReactiveElement, repeat } from '@vanishing/framework';
 
 const listStyles = `
   :host {
@@ -82,9 +82,9 @@ export class NativeList extends ReactiveElement {
     setItems(items => [...items, `Todo #${items.length + 1}`]);
   }
 
-  #removeItem(index: number): void {
+  #removeItem(label: string): void {
     const [, setItems] = this.#itemsSignal;
-    setItems(items => items.filter((_, i) => i !== index));
+    setItems(items => items.filter(item => item !== label));
   }
 
   protected template() {
@@ -99,10 +99,10 @@ export class NativeList extends ReactiveElement {
         <button type="button" onclick=${() => this.#addItem()}>Add Item</button>
       </div>
       <ul>
-        ${() => items().map((label, index) => html`
+        ${() => repeat(items(), label => label, label => html`
           <li>
             <span>${label}</span>
-            <button type="button" onclick=${() => this.#removeItem(index)}>Remove</button>
+            <button type="button" onclick=${() => this.#removeItem(label)}>Remove</button>
           </li>
         `)}
       </ul>

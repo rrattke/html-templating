@@ -1,6 +1,13 @@
-import type { TemplateResult } from './html.js';
+import { isKeyedTemplate } from './html.js';
+import type { TemplateResult, KeyedTemplate } from './html.js';
 
 type TemplateFactory = (result: TemplateResult) => { fragment: DocumentFragment; dispose: () => void };
+
+interface KeyedChild {
+  start: Comment;
+  end: Comment;
+  dispose: () => void;
+}
 
 export class NodePart {
   #start: Comment;
@@ -8,6 +15,7 @@ export class NodePart {
   #current: Node | null = null;
   #instantiateNested: TemplateFactory;
   #childDisposers: Array<() => void> = [];
+  #keyedChildren: Map<unknown, KeyedChild> | null = null;
 
   constructor(markerNode: Comment, instantiateNested: TemplateFactory) {
     const doc = markerNode.ownerDocument;
@@ -18,17 +26,27 @@ export class NodePart {
   }
 
   setValue(value: unknown): void {
-    this.#disposeChildren();
     if (value == null || value === false) {
+      this.#clearKeyedState();
+      this.#disposeChildren();
       this.#commitText('');
       return;
     }
-    if (isTemplateResult(value)) {
-      this.#commitTemplate(value);
+    if (isIterable(value)) {
+      const entries = Array.from(value);
+      if (entries.every(isKeyedTemplate)) {
+        this.#commitKeyed(entries as KeyedTemplate[]);
+      } else {
+        this.#clearKeyedState();
+        this.#disposeChildren();
+        this.#commitIterableEntries(entries);
+      }
       return;
     }
-    if (isIterable(value)) {
-      this.#commitIterable(value);
+    this.#clearKeyedState();
+    this.#disposeChildren();
+    if (isTemplateResult(value)) {
+      this.#commitTemplate(value);
       return;
     }
     if (value instanceof Node) {
@@ -44,12 +62,44 @@ export class NodePart {
     this.#commitNode(instance.fragment);
   }
 
-  #commitIterable(values: Iterable<unknown>): void {
+  #commitIterableEntries(values: unknown[]): void {
     const fragment = this.#end.ownerDocument.createDocumentFragment();
     for (const value of values) {
       this.#appendIterableValue(fragment, value);
     }
     this.#commitNode(fragment);
+  }
+
+  #commitKeyed(entries: KeyedTemplate[]): void {
+    const parent = this.#end.parentNode;
+    if (!parent) {
+      return;
+    }
+    if (!this.#keyedChildren) {
+      this.#keyedChildren = new Map();
+    }
+    const seen = new Set<unknown>();
+    let anchor: ChildNode | null = this.#end;
+    for (let i = entries.length - 1; i >= 0; i--) {
+      const entry = entries[i];
+      const existing = this.#keyedChildren.get(entry.key);
+      if (existing) {
+        this.#moveKeyedChild(existing, anchor);
+        anchor = existing.start;
+      } else {
+        const child = this.#createKeyedChild(entry.template, anchor);
+        this.#keyedChildren.set(entry.key, child);
+        anchor = child.start;
+      }
+      seen.add(entry.key);
+    }
+    for (const [key, child] of Array.from(this.#keyedChildren.entries())) {
+      if (!seen.has(key)) {
+        this.#removeKeyedChild(child);
+        this.#keyedChildren.delete(key);
+      }
+    }
+    this.#current = null;
   }
 
   #appendIterableValue(target: DocumentFragment, value: unknown): void {
@@ -80,6 +130,17 @@ export class NodePart {
       const dispose = this.#childDisposers.pop();
       dispose?.();
     }
+  }
+
+  #clearKeyedState(): void {
+    if (!this.#keyedChildren) {
+      return;
+    }
+    for (const child of this.#keyedChildren.values()) {
+      this.#removeKeyedChild(child);
+    }
+    this.#keyedChildren = null;
+    this.#current = null;
   }
 
   #commitText(text: string): void {
@@ -114,6 +175,48 @@ export class NodePart {
       pointer = next;
     }
     this.#current = null;
+  }
+
+  #createKeyedChild(template: TemplateResult, anchor: ChildNode | null): KeyedChild {
+    const { fragment, dispose } = this.#instantiateNested(template);
+    const doc = this.#end.ownerDocument;
+    const start = doc.createComment('key-start');
+    const end = doc.createComment('key-end');
+    const wrapper = doc.createDocumentFragment();
+    wrapper.append(start);
+    wrapper.append(fragment);
+    wrapper.append(end);
+    this.#end.parentNode?.insertBefore(wrapper, anchor);
+    return { start, end, dispose };
+  }
+
+  #moveKeyedChild(child: KeyedChild, anchor: ChildNode | null): void {
+    const parent = this.#end.parentNode;
+    if (!parent) {
+      return;
+    }
+    let node: ChildNode | null = child.start;
+    while (node) {
+      const next: ChildNode | null = node.nextSibling;
+      parent.insertBefore(node, anchor);
+      if (node === child.end) {
+        break;
+      }
+      node = next;
+    }
+  }
+
+  #removeKeyedChild(child: KeyedChild): void {
+    child.dispose();
+    let node: ChildNode | null = child.start;
+    while (node) {
+      const next: ChildNode | null = node.nextSibling;
+      node.remove();
+      if (node === child.end) {
+        break;
+      }
+      node = next;
+    }
   }
 }
 

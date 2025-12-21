@@ -7,6 +7,14 @@ export interface TemplateResult {
   values: unknown[];
 }
 
+const KEYED_TEMPLATE = Symbol('vanishing.keyed-template');
+
+export interface KeyedTemplate {
+  key: unknown;
+  template: TemplateResult;
+  [KEYED_TEMPLATE]: true;
+}
+
 export interface TemplateRecord {
   template: HTMLTemplateElement;
   descriptors: PartDescriptor[];
@@ -31,6 +39,18 @@ const templateCache = new WeakMap<TemplateStringsArray, TemplateRecord>();
 
 export function html(strings: TemplateStringsArray, ...values: unknown[]): TemplateResult {
   return new TemplateResultImpl(strings, values);
+}
+
+export function keyed(key: unknown, template: TemplateResult): KeyedTemplate {
+  return {
+    key,
+    template,
+    [KEYED_TEMPLATE]: true
+  };
+}
+
+export function isKeyedTemplate(value: unknown): value is KeyedTemplate {
+  return Boolean((value as KeyedTemplate | null)?.[KEYED_TEMPLATE]);
 }
 
 class TemplateResultImpl implements TemplateResult {

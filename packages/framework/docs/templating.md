@@ -139,6 +139,45 @@ html`
 - The parent `NodePart` tracks all child disposers, so removing or reordering items cleans up effects immediately.
 - Iterables can be nested arbitrarily; values that are `null`/`false` are skipped automatically.
 
+### Keyed Lists (Arrow-style reuse)
+
+If you want to keep DOM nodes/effects alive while reordering or splicing lists, wrap each item in the exported `keyed()` helper so `NodePart` can reconcile by key:
+
+```ts
+import { html, keyed } from '@vanishing/framework';
+
+html`
+  <ul>
+    ${() => items().map(item => keyed(item.id, html`
+      <li>
+        <span>${item.label}</span>
+        <button onclick=${() => remove(item.id)}>Remove</button>
+      </li>
+    `))}
+  </ul>
+`;
+```
+
+- Existing keys keep their DOM and reactive disposers intact; only moved nodes are reordered, and removed keys are disposed.
+- Entries without `keyed()` still use the simpler “clear and rebuild” path, so this is fully opt-in.
+
+Prefer a shorthand? Use the `repeat()` helper which just returns an array of keyed templates for you:
+
+```ts
+import { html, repeat } from '@vanishing/framework';
+
+html`
+  <ul>
+    ${() => repeat(items(), item => item.id, item => html`
+      <li>${item.label}</li>
+    `)}
+  </ul>
+`;
+```
+
+- `repeat(iterable, keyFn, render)` works with any iterable.
+- `keyFn` must return a stable identifier per row; `render` returns the row template.
+
 ## 8. Putting It Together in `ReactiveElement`
 
 `ReactiveElement` subclasses typically:
