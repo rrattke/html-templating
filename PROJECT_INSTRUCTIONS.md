@@ -63,6 +63,13 @@ No diffing.
 No template re-evaluation.
 No virtual DOM.
 
+### 2.4 Runtime Adapters (New)
+- The template layer now depends on a tiny `PartRuntime` interface (`effect(run: () => void)`)
+- `instantiate(result, runtime?)` accepts any runtime implementation; defaults to the bundled signal runtime
+- `ReactiveElement` exposes `protected partRuntime()` so subclasses can override per-component
+- Framework exports `getPartRuntime`, `setPartRuntime`, and `getSignalRuntime` helpers to manage the default adapter
+- Component authors can swap to any reactive system by providing an adapter without touching template internals
+
 ---
 
 ## 3. Excluded Functionality

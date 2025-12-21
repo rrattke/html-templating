@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Solid Signals Example</title>
+    <style>
+      :root {
+        font-family: 'Space Grotesk', 'Sora', system-ui, sans-serif;
+        background: radial-gradient(circle at 20% 20%, #020617, #111827 70%);
+        color: #e2e8f0;
+        min-height: 100%;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+      }
+      .demo-shell {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 2rem;
+        width: min(960px, 100%);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="demo-shell">
+      <solid-signals-counter></solid-signals-counter>
+      <solid-signals-list></solid-signals-list>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -5,9 +5,10 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspace=@vanishing/framework && npm run build --workspace=example-app",
-    "dev": "npm run dev --workspace=example-app",
-    "start": "npm run dev --workspace=example-app"
+    "build": "npm run build --workspace=@vanishing/framework && npm run build --workspace=native-signals-example && npm run build --workspace=solid-signals-example",
+    "dev:native": "npm run dev --workspace=native-signals-example",
+    "dev:solid": "npm run dev --workspace=solid-signals-example",
+    "start": "npm run dev --workspace=native-signals-example"
   },
   "devDependencies": {
     "typescript": "^5.6.3"

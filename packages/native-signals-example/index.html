@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vanishing Framework Demo</title>
+    <style>
+      :root {
+        font-family: 'Space Grotesk', 'Sora', system-ui, sans-serif;
+        background: linear-gradient(180deg, #fefefe 0%, #f3f4f6 60%, #e0e7ff 100%);
+        color: #0f172a;
+        min-height: 100%;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+      }
+      .demo-shell {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 2rem;
+        width: min(960px, 100%);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="demo-shell">
+      <native-counter></native-counter>
+      <native-list></native-list>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,7 +1,8 @@
-import { createEffect } from '../reactive/signal.js';
 import type { TemplateResult, TemplateRecord, NodePartDescriptor, AttributePartDescriptor } from './html.js';
 import { getTemplateRecord, resolvePath } from './html.js';
 import { AttributePart, NodePart } from './parts.js';
+import type { PartRuntime } from './runtime.js';
+import { getPartRuntime } from './runtime.js';
 
 export interface TemplateInstance {
   fragment: DocumentFragment;
@@ -13,7 +14,7 @@ type Part = NodePart | AttributePart;
 
 type Descriptor = NodePartDescriptor | AttributePartDescriptor;
 
-export function instantiate(result: TemplateResult): TemplateInstance {
+export function instantiate(result: TemplateResult, runtime: PartRuntime = getPartRuntime()): TemplateInstance {
   const record = getTemplateRecord(result.strings);
   if (record.partCount !== result.values.length) {
     throw new Error('Template part mismatch.');
@@ -26,7 +27,7 @@ export function instantiate(result: TemplateResult): TemplateInstance {
   parts.forEach((part, index) => {
     const value = result.values[index];
     if (typeof value === 'function' && shouldTreatAsReactive(part)) {
-      const dispose = createEffect(() => {
+      const dispose = runtime.effect(() => {
         part.setValue((value as () => unknown)());
       });
       disposers.push(dispose);
