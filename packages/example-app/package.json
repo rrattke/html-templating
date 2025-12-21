@@ -1,0 +1,19 @@
+{
+  "name": "example-app",
+  "version": "1.0.0",
+  "description": "An example of a vanishing framework for web components.",
+  "main": "my-component.js",
+  "scripts": {
+    "start": "live-server ../../ --open=packages/example-app/index.html"
+  },
+  "keywords": [
+    "web-components",
+    "arrowjs",
+    "decorators"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@vanishing/framework": "file:../framework"
+  }
+}

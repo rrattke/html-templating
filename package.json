@@ -1,0 +1,13 @@
+{
+  "name": "html-templating-workspace",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "start": "npm start --workspace=example-app"
+  },
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  }
+}
