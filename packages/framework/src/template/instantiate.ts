@@ -1,0 +1,75 @@
+import { createEffect } from '../reactive/signal.js';
+import type { TemplateResult, TemplateRecord, NodePartDescriptor, AttributePartDescriptor } from './html.js';
+import { getTemplateRecord, resolvePath } from './html.js';
+import { AttributePart, NodePart } from './parts.js';
+
+export interface TemplateInstance {
+  fragment: DocumentFragment;
+  parts: Part[];
+  dispose: () => void;
+}
+
+type Part = NodePart | AttributePart;
+
+type Descriptor = NodePartDescriptor | AttributePartDescriptor;
+
+export function instantiate(result: TemplateResult): TemplateInstance {
+  const record = getTemplateRecord(result.strings);
+  if (record.partCount !== result.values.length) {
+    throw new Error('Template part mismatch.');
+  }
+
+  const fragment = record.clone();
+  const parts = createParts(record.descriptors, fragment);
+  const disposers: Array<() => void> = [];
+
+  parts.forEach((part, index) => {
+    const value = result.values[index];
+    if (typeof value === 'function' && shouldTreatAsReactive(part)) {
+      const dispose = createEffect(() => {
+        part.setValue((value as () => unknown)());
+      });
+      disposers.push(dispose);
+    } else {
+      part.setValue(value);
+    }
+  });
+
+  const dispose = () => {
+    for (const teardown of disposers) {
+      teardown();
+    }
+  };
+
+  return { fragment, parts, dispose };
+}
+
+function createParts(descriptors: Descriptor[], fragment: DocumentFragment): Part[] {
+  return descriptors.map(descriptor => {
+    if (!descriptor) {
+      throw new Error('Missing template descriptor.');
+    }
+    if (descriptor.type === 'node') {
+      const marker = resolvePath(fragment, descriptor.path);
+      if (!(marker instanceof Comment)) {
+        throw new Error('Node descriptor did not resolve to a comment marker.');
+      }
+      return new NodePart(marker);
+    }
+    if (descriptor.type === 'attribute') {
+      const element = resolvePath(fragment, descriptor.path);
+      if (!(element instanceof Element)) {
+        throw new Error('Attribute descriptor did not resolve to an element.');
+      }
+      return new AttributePart(element, descriptor.name);
+    }
+    throw new Error(`Unknown descriptor type: ${(descriptor as Descriptor).type}`);
+  });
+}
+
+function shouldTreatAsReactive(part: Part): boolean {
+  if (part instanceof AttributePart && part.isEvent) {
+    return false;
+  }
+  return true;
+}

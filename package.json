@@ -5,9 +5,11 @@
     "packages/*"
   ],
   "scripts": {
-    "start": "npm start --workspace=example-app"
+    "build": "npm run build --workspaces",
+    "dev": "npm run dev --workspace=example-app",
+    "start": "npm run dev --workspace=example-app"
   },
   "devDependencies": {
-    "live-server": "^1.2.2"
+    "typescript": "^5.6.3"
   }
 }
