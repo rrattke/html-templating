@@ -1,4 +1,4 @@
-import { createSignal, html, instantiate, ReactiveElement } from '@vanishing/framework';
+import { createSignal, html, ReactiveElement } from '@vanishing/framework';
 
 const listStyles = `
   :host {
@@ -76,7 +76,6 @@ const listStyles = `
 
 export class NativeList extends ReactiveElement {
   #itemsSignal = createSignal<string[]>(['Framework Goals', 'Runtime Swap', 'Docs Polish']);
-  #itemDisposers: Array<() => void> = [];
 
   #addItem(): void {
     const [, setItems] = this.#itemsSignal;
@@ -100,37 +99,14 @@ export class NativeList extends ReactiveElement {
         <button type="button" onclick=${() => this.#addItem()}>Add Item</button>
       </div>
       <ul>
-        ${() => this.#renderListItems(items())}
+        ${() => items().map((label, index) => html`
+          <li>
+            <span>${label}</span>
+            <button type="button" onclick=${() => this.#removeItem(index)}>Remove</button>
+          </li>
+        `)}
       </ul>
     `;
-  }
-
-  disconnectedCallback(): void {
-    this.#disposeItemTemplates();
-    super.disconnectedCallback();
-  }
-
-  #renderListItems(labels: string[]): DocumentFragment {
-    this.#disposeItemTemplates();
-    const fragment = document.createDocumentFragment();
-    labels.forEach((label, index) => {
-      const { fragment: itemFragment, dispose } = instantiate(html`
-        <li>
-          <span>${label}</span>
-          <button type="button" onclick=${() => this.#removeItem(index)}>Remove</button>
-        </li>
-      `, this.partRuntime());
-      fragment.appendChild(itemFragment);
-      this.#itemDisposers.push(dispose);
-    });
-    return fragment;
-  }
-
-  #disposeItemTemplates(): void {
-    while (this.#itemDisposers.length) {
-      const dispose = this.#itemDisposers.pop();
-      dispose?.();
-    }
   }
 }
 

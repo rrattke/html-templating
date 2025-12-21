@@ -21,7 +21,7 @@ export function instantiate(result: TemplateResult, runtime: PartRuntime = getPa
   }
 
   const fragment = record.clone();
-  const parts = createParts(record.descriptors, fragment);
+  const parts = createParts(record.descriptors, fragment, runtime);
   const disposers: Array<() => void> = [];
 
   parts.forEach((part, index) => {
@@ -45,7 +45,7 @@ export function instantiate(result: TemplateResult, runtime: PartRuntime = getPa
   return { fragment, parts, dispose };
 }
 
-function createParts(descriptors: Descriptor[], fragment: DocumentFragment): Part[] {
+function createParts(descriptors: Descriptor[], fragment: DocumentFragment, runtime: PartRuntime): Part[] {
   return descriptors.map(descriptor => {
     if (!descriptor) {
       throw new Error('Missing template descriptor.');
@@ -55,7 +55,7 @@ function createParts(descriptors: Descriptor[], fragment: DocumentFragment): Par
       if (!(marker instanceof Comment)) {
         throw new Error('Node descriptor did not resolve to a comment marker.');
       }
-      return new NodePart(marker);
+      return new NodePart(marker, value => instantiate(value, runtime));
     }
     if (descriptor.type === 'attribute') {
       const element = resolvePath(fragment, descriptor.path);

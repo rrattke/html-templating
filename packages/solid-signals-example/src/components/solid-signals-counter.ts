@@ -5,28 +5,37 @@ import { solidRuntime } from '../runtime/solid-runtime.js';
 const counterStyles = `
   :host {
     display: block;
-    padding: 2rem;
-    border-radius: 1.75rem;
-    background: linear-gradient(135deg, #312e81, #7c3aed);
-    color: #f4f0ff;
+    padding: 1.75rem;
+    border-radius: 1.5rem;
+    background: linear-gradient(135deg, #ffffff, #eef9ff);
+    color: #0f172a;
     font-family: 'Space Grotesk', 'Sora', system-ui, sans-serif;
-    box-shadow: 0 18px 45px rgba(52, 31, 151, 0.45);
-    min-width: 280px;
+    box-shadow: 0 28px 60px rgba(15, 23, 42, 0.08);
+    min-width: 300px;
+    border: 1px solid rgba(14, 165, 233, 0.2);
   }
   header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 1rem;
+    margin-bottom: 0.9rem;
     text-transform: uppercase;
     letter-spacing: 0.15em;
-    font-size: 0.8rem;
-    opacity: 0.85;
+    font-size: 0.78rem;
+    color: #0ea5e9;
+  }
+  header span:last-child {
+    background: rgba(14, 165, 233, 0.18);
+    border-radius: 999px;
+    padding: 0.2rem 0.8rem;
+    color: #0f172a;
+    letter-spacing: normal;
+    font-size: 0.72rem;
   }
   .value {
-    font-size: 3.25rem;
+    font-size: 3rem;
     font-weight: 600;
-    margin: 0 0 1.25rem;
+    margin: 0 0 1.3rem;
   }
   .actions {
     display: grid;
@@ -35,19 +44,18 @@ const counterStyles = `
   }
   button {
     border: none;
-    border-radius: 1rem;
-    padding: 0.75rem 1rem;
-    font-size: 1rem;
+    border-radius: 0.95rem;
+    padding: 0.7rem 1rem;
+    font-size: 0.95rem;
     font-weight: 600;
-    background: rgba(255, 255, 255, 0.18);
-    color: inherit;
+    background: rgba(14, 165, 233, 0.12);
+    color: #0f172a;
     cursor: pointer;
     transition: transform 120ms ease, background 120ms ease;
-    backdrop-filter: blur(8px);
   }
   button:hover {
-    transform: translateY(-2px);
-    background: rgba(255, 255, 255, 0.28);
+    transform: translateY(-1px);
+    background: rgba(14, 165, 233, 0.22);
   }
 `;
 
