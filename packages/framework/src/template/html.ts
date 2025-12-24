@@ -5,20 +5,13 @@ const ATTR_MARKER_SUFFIX = '%%';
 export interface TemplateResult {
   strings: TemplateStringsArray;
   values: unknown[];
-}
-
-const KEYED_TEMPLATE = Symbol('vanishing.keyed-template');
-
-export interface KeyedTemplate {
-  key: unknown;
-  template: TemplateResult;
-  [KEYED_TEMPLATE]: true;
+  key?: unknown;
+  setKey(keyValue: unknown): this;
 }
 
 export interface TemplateRecord {
   template: HTMLTemplateElement;
   descriptors: PartDescriptor[];
-  partCount: number;
   clone(): DocumentFragment;
 }
 
@@ -41,20 +34,15 @@ export function html(strings: TemplateStringsArray, ...values: unknown[]): Templ
   return new TemplateResultImpl(strings, values);
 }
 
-export function keyed(key: unknown, template: TemplateResult): KeyedTemplate {
-  return {
-    key,
-    template,
-    [KEYED_TEMPLATE]: true
-  };
-}
-
-export function isKeyedTemplate(value: unknown): value is KeyedTemplate {
-  return Boolean((value as KeyedTemplate | null)?.[KEYED_TEMPLATE]);
-}
-
 class TemplateResultImpl implements TemplateResult {
+  key?: unknown;
+
   constructor(public strings: TemplateStringsArray, public values: unknown[]) {}
+
+  setKey(keyValue: unknown): this {
+    this.key = keyValue;
+    return this;
+  }
 }
 
 export function getTemplateRecord(strings: TemplateStringsArray): TemplateRecord {
@@ -75,7 +63,6 @@ function createTemplateRecord(strings: TemplateStringsArray): TemplateRecord {
   return {
     template,
     descriptors,
-    partCount,
     clone: () => template.content.cloneNode(true) as DocumentFragment
   };
 }

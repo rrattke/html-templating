@@ -1,4 +1,4 @@
-import { createSignal, html, ReactiveElement, repeat } from '@vanishing/framework';
+import { createSignal, html, ReactiveElement } from '@vanishing/framework';
 
 const listStyles = `
   :host {
@@ -99,12 +99,12 @@ export class NativeList extends ReactiveElement {
         <button type="button" onclick=${() => this.#addItem()}>Add Item</button>
       </div>
       <ul>
-        ${() => repeat(items(), label => label, label => html`
+        ${() => items().map(label => html`
           <li>
             <span>${label}</span>
             <button type="button" onclick=${() => this.#removeItem(label)}>Remove</button>
           </li>
-        `)}
+        `.setKey(label))}
       </ul>
     `;
   }

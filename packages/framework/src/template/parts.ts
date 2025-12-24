@@ -1,5 +1,4 @@
-import { isKeyedTemplate } from './html.js';
-import type { TemplateResult, KeyedTemplate } from './html.js';
+import type { TemplateResult } from './html.js';
 
 type TemplateFactory = (result: TemplateResult) => { fragment: DocumentFragment; dispose: () => void };
 
@@ -34,8 +33,8 @@ export class NodePart {
     }
     if (isIterable(value)) {
       const entries = Array.from(value);
-      if (entries.every(isKeyedTemplate)) {
-        this.#commitKeyed(entries as KeyedTemplate[]);
+      if (entries.every(e => isTemplateResult(e) && e.key !== undefined)) {
+        this.#commitKeyed(entries as TemplateResult[]);
       } else {
         this.#clearKeyedState();
         this.#disposeChildren();
@@ -70,7 +69,7 @@ export class NodePart {
     this.#commitNode(fragment);
   }
 
-  #commitKeyed(entries: KeyedTemplate[]): void {
+  #commitKeyed(entries: TemplateResult[]): void {
     const parent = this.#end.parentNode;
     if (!parent) {
       return;
@@ -82,16 +81,16 @@ export class NodePart {
     let anchor: ChildNode | null = this.#end;
     for (let i = entries.length - 1; i >= 0; i--) {
       const entry = entries[i];
-      const existing = this.#keyedChildren.get(entry.key);
+      const existing = this.#keyedChildren.get(entry.key!);
       if (existing) {
         this.#moveKeyedChild(existing, anchor);
         anchor = existing.start;
       } else {
-        const child = this.#createKeyedChild(entry.template, anchor);
-        this.#keyedChildren.set(entry.key, child);
+        const child = this.#createKeyedChild(entry, anchor);
+        this.#keyedChildren.set(entry.key!, child);
         anchor = child.start;
       }
-      seen.add(entry.key);
+      seen.add(entry.key!);
     }
     for (const [key, child] of Array.from(this.#keyedChildren.entries())) {
       if (!seen.has(key)) {

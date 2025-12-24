@@ -1,4 +1,4 @@
-import { html, ReactiveElement, repeat } from '@vanishing/framework';
+import { html, ReactiveElement } from '@vanishing/framework';
 import { createSignal } from 'solid-js';
 import { solidRuntime } from '../runtime/solid-runtime.js';
 
@@ -106,16 +106,16 @@ export class SolidSignalsList extends ReactiveElement {
         <strong>Solid Task List</strong>
         <span>${() => this.#items().length} active</span>
       </header>
-      <div class="actions">
+        <div class="actions">
         <button type="button" onclick=${() => this.#addItem()}>Add Task</button>
       </div>
         <ul>
-          ${() => repeat(this.#items(), label => label, label => html`
+          ${() => this.#items().map(label => html`
             <li>
               <span>${label}</span>
               <button type="button" onclick=${() => this.#removeItem(label)}>Remove</button>
             </li>
-          `)}
+          `.setKey(label))}
         </ul>
     `;
   }

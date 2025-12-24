@@ -16,7 +16,7 @@ type Descriptor = NodePartDescriptor | AttributePartDescriptor;
 
 export function instantiate(result: TemplateResult, runtime: PartRuntime = getPartRuntime()): TemplateInstance {
   const record = getTemplateRecord(result.strings);
-  if (record.partCount !== result.values.length) {
+  if (record.descriptors.length !== result.values.length) {
     throw new Error('Template part mismatch.');
   }
 
