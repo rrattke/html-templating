@@ -1,5 +1,5 @@
 {
-  "name": "solid-signals-example",
+  "name": "native-signals-example",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -9,11 +9,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@vanishing/framework": "file:../framework",
-    "solid-js": "^1.9.10"
+    "@vanishing/framework": "*"
   },
   "devDependencies": {
     "@types/node": "^22.8.4",
-    "vite": "^5.4.21"
+    "vite": "^5.4.8"
   }
 }

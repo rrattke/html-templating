@@ -1,6 +1,5 @@
 import { html, ReactiveElement } from '@vanishing/framework';
 import { createSignal } from 'solid-js';
-import { solidRuntime } from '../runtime/solid-runtime.js';
 
 const listStyles = `
   :host {
@@ -85,10 +84,6 @@ export class SolidSignalsList extends ReactiveElement {
     const [items, setItems] = createSignal<string[]>(['Adapter spike', 'Solid runtime', 'Docs refresh']);
     this.#items = items;
     this.#setItems = setItems;
-  }
-
-  protected override partRuntime() {
-    return solidRuntime;
   }
 
   #addItem(): void {

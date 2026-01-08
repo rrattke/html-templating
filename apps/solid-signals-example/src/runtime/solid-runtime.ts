@@ -1,5 +1,6 @@
 import { createEffect, createRoot } from 'solid-js';
 import type { PartRuntime } from '@vanishing/framework';
+import { setPartRuntime } from '@vanishing/framework';
 
 export const solidRuntime: PartRuntime = {
   effect(run) {
@@ -9,3 +10,6 @@ export const solidRuntime: PartRuntime = {
     });
   }
 };
+
+// Set as default runtime immediately when this module loads
+setPartRuntime(solidRuntime);

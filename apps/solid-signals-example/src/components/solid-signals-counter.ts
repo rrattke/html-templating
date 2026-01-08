@@ -1,6 +1,5 @@
 import { html, ReactiveElement } from '@vanishing/framework';
 import { createSignal } from 'solid-js';
-import { solidRuntime } from '../runtime/solid-runtime.js';
 
 const counterStyles = `
   :host {
@@ -68,10 +67,6 @@ export class SolidSignalsCounter extends ReactiveElement {
     const [count, setCount] = createSignal(2);
     this.#count = count;
     this.#setCount = setCount;
-  }
-
-  protected override partRuntime() {
-    return solidRuntime;
   }
 
   protected template() {
