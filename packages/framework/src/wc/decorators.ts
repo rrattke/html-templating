@@ -1,4 +1,5 @@
-import { createSignal, type Signal } from '../reactive/signal.js';
+import { getPartRuntime } from '../template/runtime.js';
+import type { Signal } from '../reactive/signal.js';
 
 type DecoratedHost = Record<PropertyKey, unknown> & HTMLElement;
 
@@ -16,7 +17,8 @@ export function state<T>(initialValue: Initializer<T>) {
           const initial = typeof initialValue === 'function'
             ? (initialValue as () => T).call(this)
             : initialValue;
-          this[signalKey] = createSignal(initial);
+          const runtime = getPartRuntime();
+          this[signalKey] = runtime.createSignal(initial);
         }
         const [read] = this[signalKey] as Signal<T>;
         return read();
@@ -26,7 +28,8 @@ export function state<T>(initialValue: Initializer<T>) {
           const initial = typeof initialValue === 'function'
             ? (initialValue as () => T).call(this)
             : initialValue;
-          this[signalKey] = createSignal(initial);
+          const runtime = getPartRuntime();
+          this[signalKey] = runtime.createSignal(initial);
         }
         const [, write] = this[signalKey] as Signal<T>;
         write(value as T);

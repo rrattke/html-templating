@@ -38,9 +38,14 @@ function cleanupEffect(effect: EffectRecord): void {
 
 export type Signal<T> = [() => T, (value: WriteValue<T>) => T];
 
-export function createSignal<T>(initial: T): Signal<T> {
+interface SignalOptions<T> {
+  equals?: boolean | ((prev: T, next: T) => boolean);
+}
+
+export function createSignal<T>(initial: T, options?: SignalOptions<T>): Signal<T> {
   let value = initial;
   const subscribers: SubscriberSet = new Set();
+  const equals = options?.equals ?? true;
 
   const read = (): T => {
     if (currentEffect) {
@@ -52,12 +57,28 @@ export function createSignal<T>(initial: T): Signal<T> {
 
   const write = (next: WriteValue<T>): T => {
     const resolved = typeof next === 'function' ? (next as Updater<T>)(value) : next;
-    if (Object.is(resolved, value)) {
+    
+    // Check equality
+    const hasChanged = equals === false 
+      ? true 
+      : typeof equals === 'function' 
+        ? !equals(value, resolved)
+        : !Object.is(resolved, value);
+    
+    if (!hasChanged) {
       return value;
     }
+    
     value = resolved;
-    for (const effect of [...subscribers]) {
-      effect.run();
+    
+    if (batchDepth > 0) {
+      for (const effect of subscribers) {
+        batchedEffects.add(effect);
+      }
+    } else {
+      for (const effect of [...subscribers]) {
+        effect.run();
+      }
     }
     return value;
   };
@@ -101,5 +122,42 @@ export function createEffect(fn: () => void): () => void {
 export function onCleanup(fn: CleanupFn): void {
   if (cleanupStack) {
     cleanupStack.push(fn);
+  }
+}
+
+export type Memo<T> = () => T;
+
+export function createMemo<T>(fn: () => T): Memo<T> {
+  const [memo, setMemo] = createSignal<T>(undefined as T, { equals: false });
+  createEffect(() => setMemo(fn()));
+  return memo;
+}
+
+let batchDepth = 0;
+let batchedEffects: Set<EffectRecord> = new Set();
+
+export function batch<T>(fn: () => T): T {
+  batchDepth++;
+  try {
+    return fn();
+  } finally {
+    batchDepth--;
+    if (batchDepth === 0) {
+      const effects = batchedEffects;
+      batchedEffects = new Set();
+      for (const effect of effects) {
+        effect.run();
+      }
+    }
+  }
+}
+
+export function untrack<T>(fn: () => T): T {
+  const prevEffect = currentEffect;
+  currentEffect = null;
+  try {
+    return fn();
+  } finally {
+    currentEffect = prevEffect;
   }
 }
