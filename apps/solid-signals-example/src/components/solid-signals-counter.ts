@@ -1,5 +1,4 @@
-import { html, ReactiveElement } from '@vanishing/framework';
-import { createSignal } from 'solid-js';
+import { html, ReactiveElement, state } from '@vanishing/framework';
 
 const counterStyles = `
   :host {
@@ -59,28 +58,21 @@ const counterStyles = `
 `;
 
 export class SolidSignalsCounter extends ReactiveElement {
-  #count!: () => number;
-  #setCount!: (value: number | ((prev: number) => number)) => number;
-
-  constructor() {
-    super();
-    const [count, setCount] = createSignal(2);
-    this.#count = count;
-    this.#setCount = setCount;
-  }
+  @state
+  accessor count = 2;
 
   protected template() {
     return html`
       <style>${counterStyles}</style>
       <header>
         <span>Solid Signals</span>
-        <span>${() => (this.#count() % 2 === 0 ? 'even' : 'odd')}</span>
+        <span>${() => (this.count % 2 === 0 ? 'even' : 'odd')}</span>
       </header>
-      <p class="value">${() => this.#count()}</p>
+      <p class="value">${() => this.count}</p>
       <div class="actions">
-        <button type="button" onclick=${() => this.#setCount(value => value - 1)}>-1</button>
-        <button type="button" onclick=${() => this.#setCount(() => 0)}>Reset</button>
-        <button type="button" onclick=${() => this.#setCount(value => value + 1)}>+1</button>
+        <button type="button" onclick=${() => this.count--}>-1</button>
+        <button type="button" onclick=${() => this.count = 0}>Reset</button>
+        <button type="button" onclick=${() => this.count++}>+1</button>
       </div>
     `;
   }

@@ -7,6 +7,10 @@ import { getPartRuntime } from '../template/runtime.js';
 export abstract class ReactiveElement extends HTMLElement {
   #dispose: (() => void) | null = null;
 
+  constructor() {
+    super();
+  }
+
   protected template(): TemplateResult {
     return html``;
   }

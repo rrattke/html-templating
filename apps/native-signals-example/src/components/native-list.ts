@@ -1,4 +1,4 @@
-import { createSignal, html, ReactiveElement } from '@vanishing/framework';
+import { html, ReactiveElement, state } from '@vanishing/framework';
 
 const listStyles = `
   :host {
@@ -75,31 +75,29 @@ const listStyles = `
 `;
 
 export class NativeList extends ReactiveElement {
-  #itemsSignal = createSignal<string[]>(['Framework Goals', 'Runtime Swap', 'Docs Polish']);
+  @state
+  accessor items = ['Framework Goals', 'Runtime Swap', 'Docs Polish'];
 
   #addItem(): void {
-    const [, setItems] = this.#itemsSignal;
-    setItems(items => [...items, `Todo #${items.length + 1}`]);
+    this.items = [...this.items, `Todo #${this.items.length + 1}`];
   }
 
   #removeItem(label: string): void {
-    const [, setItems] = this.#itemsSignal;
-    setItems(items => items.filter(item => item !== label));
+    this.items = this.items.filter(item => item !== label);
   }
 
   protected template() {
-    const [items] = this.#itemsSignal;
     return html`
       <style>${listStyles}</style>
       <header>
         <strong>Native Todo List</strong>
-        <span>${() => items().length} items</span>
+        <span>${() => this.items.length} items</span>
       </header>
       <div class="action-bar">
         <button type="button" onclick=${() => this.#addItem()}>Add Item</button>
       </div>
       <ul>
-        ${() => items().map(label => html`
+        ${() => this.items.map(label => html`
           <li>
             <span>${label}</span>
             <button type="button" onclick=${() => this.#removeItem(label)}>Remove</button>

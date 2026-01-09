@@ -1,4 +1,4 @@
-import { createSignal, html, ReactiveElement } from '@vanishing/framework';
+import { html, ReactiveElement, state } from '@vanishing/framework';
 
 const counterStyles = `
   :host {
@@ -47,18 +47,23 @@ const counterStyles = `
 `;
 
 export class NativeCounter extends ReactiveElement {
-  #countSignal = createSignal(4);
+  @state
+  accessor count = 4;
+
+
+  constructor() {
+    super();
+  }
 
   protected template() {
-    const [count, setCount] = this.#countSignal;
     return html`
       <style>${counterStyles}</style>
       <header>Native Signals</header>
-      <p class="value">${() => count()}</p>
+      <p class="value">${() => this.count}</p>
       <div class="actions">
-        <button type="button" onclick=${() => setCount(value => value - 1)}>-1</button>
-        <button type="button" onclick=${() => setCount(value => value + 1)}>+1</button>
-        <button type="button" onclick=${() => setCount(() => 0)}>Reset</button>
+        <button type="button" onclick=${() => this.count--}>-1</button>
+        <button type="button" onclick=${() => this.count++}>+1</button>
+        <button type="button" onclick=${() => this.count = 0}>Reset</button>
       </div>
     `;
   }

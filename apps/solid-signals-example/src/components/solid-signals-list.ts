@@ -1,5 +1,4 @@
-import { html, ReactiveElement } from '@vanishing/framework';
-import { createSignal } from 'solid-js';
+import { html, ReactiveElement, state } from '@vanishing/framework';
 
 const listStyles = `
   :host {
@@ -76,22 +75,15 @@ const listStyles = `
 `;
 
 export class SolidSignalsList extends ReactiveElement {
-  #items!: () => string[];
-  #setItems!: (value: string[] | ((prev: string[]) => string[])) => string[];
-
-  constructor() {
-    super();
-    const [items, setItems] = createSignal<string[]>(['Adapter spike', 'Solid runtime', 'Docs refresh']);
-    this.#items = items;
-    this.#setItems = setItems;
-  }
+  @state
+  accessor items = ['Adapter spike', 'Solid runtime', 'Docs refresh'];
 
   #addItem(): void {
-    this.#setItems(list => [...list, `Task #${list.length + 1}`]);
+    this.items = [...this.items, `Task #${this.items.length + 1}`];
   }
 
   #removeItem(label: string): void {
-    this.#setItems(list => list.filter(item => item !== label));
+    this.items = this.items.filter(item => item !== label);
   }
 
   protected template() {
@@ -99,13 +91,13 @@ export class SolidSignalsList extends ReactiveElement {
       <style>${listStyles}</style>
       <header>
         <strong>Solid Task List</strong>
-        <span>${() => this.#items().length} active</span>
+        <span>${() => this.items.length} active</span>
       </header>
         <div class="actions">
         <button type="button" onclick=${() => this.#addItem()}>Add Task</button>
       </div>
         <ul>
-          ${() => this.#items().map(label => html`
+          ${() => this.items.map(label => html`
             <li>
               <span>${label}</span>
               <button type="button" onclick=${() => this.#removeItem(label)}>Remove</button>

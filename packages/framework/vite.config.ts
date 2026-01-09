@@ -6,6 +6,10 @@ import { fileURLToPath } from 'node:url';
 const dirname = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
+  esbuild: {
+    target: 'es2022',
+    keepNames: true
+  },
   build: {
     lib: {
       entry: path.resolve(dirname, 'src/index.ts'),
@@ -14,7 +18,7 @@ export default defineConfig({
     outDir: 'lib',
     emptyOutDir: true,
     sourcemap: true,
-    target: 'es2020',
+    target: 'es2022',
     rollupOptions: {
       output: {
         entryFileNames: 'index.js'
