@@ -2,16 +2,16 @@ import { getPartRuntime } from '../template/runtime.js';
 import type { Signal } from '../reactive/signal.js';
 
 export function state<This, Value>(
-  target: ClassAccessorDecoratorTarget<This, Signal<Value>>
+  target: ClassAccessorDecoratorTarget<This, Value>
 ): ClassAccessorDecoratorResult<This, Value> {
-  const { get: getStorage } = target;
+  const { get: getStorage } = target as unknown as ClassAccessorDecoratorTarget<This, Signal<Value>>;
 
   return {
-    init(this: This, initialValue: Value): Value {
+    init(this: This, initialValue: Value): any {
       const runtime = getPartRuntime();
       const signal = runtime.createSignal(initialValue);
       // Return the signal directly - the decorator infrastructure will store it
-      return signal as unknown as Value;
+      return signal;
     },
     get(this: This): Value {
       const signal = getStorage.call(this);

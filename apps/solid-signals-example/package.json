@@ -9,11 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@vanishing/framework": "*",
+    "@vanishing/framework": "^0.1.0",
     "solid-js": "^1.9.10"
   },
   "devDependencies": {
-    "@types/node": "^22.8.4",
+    "@types/node": "^22.19.5",
     "vite": "^5.4.21"
   }
 }
