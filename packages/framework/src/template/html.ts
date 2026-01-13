@@ -69,29 +69,141 @@ function createTemplateRecord(strings: TemplateStringsArray): TemplateRecord {
 
 function buildHTML(strings: TemplateStringsArray): string {
   let result = '';
+  const context = new HTMLContextTracker();
   for (let i = 0; i < strings.length - 1; i++) {
     const chunk = strings[i];
+    context.advance(chunk);
     result += chunk;
-    if (isAttributePosition(chunk)) {
-      result += attributeMarkerForIndex(i);
+    if (context.inAttributeValue()) {
+      result += createAttributeMarker(i);
     } else {
-      result += nodeMarkerForIndex(i);
+      result += createNodeMarker(i);
     }
   }
   result += strings[strings.length - 1];
   return result;
 }
 
-function nodeMarkerForIndex(index: number): string {
+function createNodeMarker(index: number): string {
   return `<!--${NODE_MARKER_PREFIX}${index}-->`;
 }
 
-function attributeMarkerForIndex(index: number): string {
+function createAttributeMarker(index: number): string {
   return `"${ATTR_MARKER_PREFIX}${index}${ATTR_MARKER_SUFFIX}"`;
 }
 
-function isAttributePosition(chunk: string): boolean {
-  return /=\s*$/.test(chunk);
+type ParserMode =
+  | 'TEXT'
+  | 'TAG'
+  | 'COMMENT'
+  | 'ATTR_VALUE_DOUBLE'
+  | 'ATTR_VALUE_SINGLE'
+  | 'ATTR_VALUE_UNQUOTED';
+
+class HTMLContextTracker {
+  #mode: ParserMode = 'TEXT';
+  #attrValuePending = false;
+
+  advance(chunk: string): void {
+    for (let i = 0; i < chunk.length; i++) {
+      const ch = chunk[i];
+      switch (this.#mode) {
+        case 'TEXT': {
+          if (ch === '<') {
+            if (chunk.startsWith('!--', i + 1)) {
+              this.#mode = 'COMMENT';
+              i += 3; // skip past "!--"
+            } else {
+              this.#mode = 'TAG';
+            }
+          }
+          break;
+        }
+        case 'COMMENT': {
+          if (ch === '-' && chunk[i + 1] === '-' && chunk[i + 2] === '>') {
+            this.#mode = 'TEXT';
+            i += 2;
+          }
+          break;
+        }
+        case 'TAG': {
+          if (this.#attrValuePending) {
+            if (isWhitespace(ch)) {
+              break;
+            }
+            this.#attrValuePending = false;
+            if (ch === '"') {
+              this.#mode = 'ATTR_VALUE_DOUBLE';
+              break;
+            }
+            if (ch === '\'') {
+              this.#mode = 'ATTR_VALUE_SINGLE';
+              break;
+            }
+            if (ch === '>') {
+              this.#mode = 'TEXT';
+              break;
+            }
+            this.#mode = 'ATTR_VALUE_UNQUOTED';
+            break;
+          }
+          if (ch === '=') {
+            this.#attrValuePending = true;
+            break;
+          }
+          if (ch === '"') {
+            this.#mode = 'ATTR_VALUE_DOUBLE';
+            break;
+          }
+          if (ch === '\'') {
+            this.#mode = 'ATTR_VALUE_SINGLE';
+            break;
+          }
+          if (ch === '>') {
+            this.#mode = 'TEXT';
+            break;
+          }
+          break;
+        }
+        case 'ATTR_VALUE_DOUBLE': {
+          if (ch === '"') {
+            this.#mode = 'TAG';
+          }
+          break;
+        }
+        case 'ATTR_VALUE_SINGLE': {
+          if (ch === '\'') {
+            this.#mode = 'TAG';
+          }
+          break;
+        }
+        case 'ATTR_VALUE_UNQUOTED': {
+          if (isWhitespace(ch)) {
+            this.#mode = 'TAG';
+            break;
+          }
+          if (ch === '>') {
+            this.#mode = 'TEXT';
+            break;
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  inAttributeValue(): boolean {
+    return (
+      this.#mode === 'ATTR_VALUE_DOUBLE' ||
+      this.#mode === 'ATTR_VALUE_SINGLE' ||
+      this.#mode === 'ATTR_VALUE_UNQUOTED' ||
+      this.#attrValuePending
+    );
+  }
+}
+
+function isWhitespace(ch: string): boolean {
+  return ch === ' ' || ch === '\n' || ch === '\t' || ch === '\r' || ch === '\f';
 }
 
 function scanTemplateContent(fragment: DocumentFragment, descriptors: PartDescriptor[]): void {
