@@ -89,7 +89,7 @@ function buildHTML(strings: TemplateStringsArray): string {
     context.advance(chunk);
     result += chunk;
     if (context.inAttributeValue()) {
-      result += createAttributeMarker(i);
+      result += createAttributeMarker(i, context.getMode());
     } else {
       result += createNodeMarker(i);
     }
@@ -102,7 +102,12 @@ function createNodeMarker(index: number): string {
   return `<!--${NODE_MARKER_PREFIX}${index}-->`;
 }
 
-function createAttributeMarker(index: number): string {
+function createAttributeMarker(index: number, mode: ParserMode): string {
+  // If already inside a quoted attribute, don't add quotes
+  if (mode === 'ATTR_VALUE_DOUBLE' || mode === 'ATTR_VALUE_SINGLE') {
+    return `${ATTR_MARKER_PREFIX}${index}${ATTR_MARKER_SUFFIX}`;
+  }
+  // For unquoted or pending (at the = sign), add quotes
   return `"${ATTR_MARKER_PREFIX}${index}${ATTR_MARKER_SUFFIX}"`;
 }
 
@@ -213,6 +218,10 @@ class HTMLContextTracker {
       this.#mode === 'ATTR_VALUE_UNQUOTED' ||
       this.#attrValuePending
     );
+  }
+
+  getMode(): ParserMode {
+    return this.#mode;
   }
 }
 
