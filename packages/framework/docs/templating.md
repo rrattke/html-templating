@@ -61,6 +61,29 @@ Attribute Part Marker  : "%%PART:INDEX%%"
 
 The `INDEX` matches the expression order in the original template literal.
 
+#### Visualizing the Parse Flow
+
+```mermaid
+sequenceDiagram
+    participant App
+    participant HTML as html Tag
+    participant Cache
+    participant Parser
+
+    App->>HTML: html`<div>${val}</div>`
+    HTML->>Cache: check(strings)
+    alt Cache Miss
+        Cache->>Parser: createTemplateRecord(strings)
+        Parser->>Parser: buildHTML with Markers
+        Parser->>Parser: document.createElement('template')
+        Parser->>Parser: scanTemplateContent(TreeWalker)
+        Parser-->>Cache: return TemplateRecord
+    end
+    Cache-->>HTML: return TemplateRecord
+    HTML-->>App: return TemplateResult
+```
+
+
 ## 4. Instantiation (`instantiate`)
 
 `instantiate(result, runtime)` wires a `TemplateResult` to a `PartRuntime`:
@@ -72,6 +95,28 @@ The `INDEX` matches the expression order in the original template literal.
    - Functions (signals/effects) become tracked reactions via `runtime.effect`.
    - All other values are written once.
 5. Returns `{ fragment, parts, dispose }`, where `dispose` tears down every effect the runtime created.
+
+#### Visualizing Instantiation
+
+```mermaid
+flowchart TD
+    A[TemplateResult] --> B{Check Cache}
+    B -- Found --> C[Get TemplateRecord]
+    B -- New --> D[Create & Parse]
+    D --> C
+    C --> E[Clone DOM Fragment]
+    C --> F[Traverse Descriptors]
+    F --> G[Resolve Paths in Clone]
+    G --> H{Create Part}
+    H -- Node --> I[NodePart]
+    H -- Attribute --> J[AttributePart]
+    I --> K[Bind Values]
+    J --> K
+    K -- Value is Signal --> L[Create Effect]
+    K -- Value is Static --> M[Set Initial Value]
+    L -->N[Signal Update] --> O[part.setValue()]
+```
+
 
 ## 5. Part Types
 
