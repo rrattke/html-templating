@@ -12,11 +12,8 @@ describe('integration tests', () => {
     
     // Set a simple runtime for non-reactive tests
     setPartRuntime({
-      effect: (fn) => {
-        fn();
-        return () => {};
-      }
-    });
+      effect: (fn: () => void) => fn()
+    } as any);
   });
 
   describe('style tag with dynamic content', () => {

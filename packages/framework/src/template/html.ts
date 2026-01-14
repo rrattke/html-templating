@@ -15,7 +15,7 @@ export interface TemplateRecord {
   clone(): DocumentFragment;
 }
 
-type PartDescriptor = NodePartDescriptor | AttributePartDescriptor | TextContentPartDescriptor;
+type PartDescriptor = NodePartDescriptor | AttributePartDescriptor | TextContentPartDescriptor | TextTemplatePartDescriptor;
 
 export interface NodePartDescriptor {
   type: 'node';
@@ -31,6 +31,15 @@ export interface AttributePartDescriptor {
 export interface TextContentPartDescriptor {
   type: 'textContent';
   path: number[];
+}
+
+export interface TextTemplatePartDescriptor {
+  type: 'textTemplate';
+  target: 'attribute' | 'textContent';
+  name?: string; // attribute name if target is 'attribute'
+  path: number[];
+  strings: string[];
+  indices: number[]; // which value indices correspond to this template
 }
 
 const templateCache = new WeakMap<TemplateStringsArray, TemplateRecord>();
@@ -138,46 +147,104 @@ function extractTextContentPart(element: Element, root: DocumentFragment, descri
   const markerPattern = new RegExp(`<!--${NODE_MARKER_PREFIX}(\\d+)-->`, 'g');
   const matches = [...text.matchAll(markerPattern)];
   
-  if (matches.length > 0) {
-    // Remove all markers from the text content
-    let cleanedText = text;
-    for (const match of matches) {
-      const index = Number.parseInt(match[1], 10);
-      cleanedText = cleanedText.replace(match[0], '');
-      
-      // Create a descriptor that points to the element itself
-      // The runtime will handle setting textContent on the element
-      descriptors[index] = {
-        type: 'textContent',
-        path: buildPath(element, root)
-      };
-    }
+  if (matches.length === 0) {
+    return;
+  }
+  
+  if (matches.length === 1) {
+    // Single expression - use simple TextContentPart
+    const index = Number.parseInt(matches[0][1], 10);
+    const cleanedText = text.replace(matches[0][0], '');
     element.textContent = cleanedText;
+    descriptors[index] = {
+      type: 'textContent',
+      path: buildPath(element, root)
+    };
+    return;
+  }
+  
+  // Multiple expressions - use TextTemplate
+  const strings: string[] = [];
+  const indices: number[] = [];
+  let lastIndex = 0;
+  
+  for (const match of matches) {
+    const valueIndex = Number.parseInt(match[1], 10);
+    indices.push(valueIndex);
+    strings.push(text.slice(lastIndex, match.index));
+    lastIndex = match.index! + match[0].length;
+  }
+  strings.push(text.slice(lastIndex));
+  
+  element.textContent = strings.join('');
+  
+  // Create one TextTemplatePartDescriptor with all indices
+  const descriptor: TextTemplatePartDescriptor = {
+    type: 'textTemplate',
+    target: 'textContent',
+    path: buildPath(element, root),
+    strings,
+    indices
+  };
+  
+  // Assign to all value indices
+  for (const idx of indices) {
+    descriptors[idx] = descriptor;
   }
 }
 
 function extractAttributeParts(element: Element, root: DocumentFragment, descriptors: PartDescriptor[]): void {
-  for (const attr of Array.from(element.attributes)) {
+  const attrArray = Array.from(element.attributes);
+  for (const attr of attrArray) {
     const value = attr.value;
-    const markerIndex = value.indexOf(ATTR_MARKER_PREFIX);
-    if (markerIndex === -1) {
+    const markerPattern = new RegExp(`${ATTR_MARKER_PREFIX}(\\d+)${ATTR_MARKER_SUFFIX}`, 'g');
+    const matches = [...value.matchAll(markerPattern)];
+    
+    if (matches.length === 0) {
       continue;
     }
-    const trimmed = value.trim();
-    if (!trimmed.startsWith(ATTR_MARKER_PREFIX) || !trimmed.endsWith(ATTR_MARKER_SUFFIX)) {
-      throw new Error('Attribute expressions must only contain a single placeholder.');
+    
+    if (matches.length === 1 && value === matches[0][0]) {
+      // Single expression without static text - use simple AttributePart
+      const index = Number.parseInt(matches[0][1], 10);
+      element.removeAttribute(attr.name);
+      descriptors[index] = {
+        type: 'attribute',
+        name: attr.name,
+        path: buildPath(element, root)
+      };
+      continue;
     }
-    const index = parseAttributeMarker(trimmed);
-    const canonical = `${ATTR_MARKER_PREFIX}${index}${ATTR_MARKER_SUFFIX}`;
-    if (trimmed !== canonical) {
-      throw new Error('Attribute expressions cannot mix static text with placeholders.');
+    
+    // Multiple expressions or mixed with static text - use TextTemplate
+    const strings: string[] = [];
+    const indices: number[] = [];
+    let lastIndex = 0;
+    
+    for (const match of matches) {
+      const valueIndex = Number.parseInt(match[1], 10);
+      indices.push(valueIndex);
+      strings.push(value.slice(lastIndex, match.index));
+      lastIndex = match.index! + match[0].length;
     }
+    strings.push(value.slice(lastIndex));
+    
     element.removeAttribute(attr.name);
-    descriptors[index] = {
-      type: 'attribute',
+    
+    // Create one TextTemplatePartDescriptor with all indices
+    const descriptor: TextTemplatePartDescriptor = {
+      type: 'textTemplate',
+      target: 'attribute',
       name: attr.name,
-      path: buildPath(element, root)
+      path: buildPath(element, root),
+      strings,
+      indices
     };
+    
+    // Assign to all value indices
+    for (const idx of indices) {
+      descriptors[idx] = descriptor;
+    }
   }
 }
 

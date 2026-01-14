@@ -1,6 +1,6 @@
-import type { TemplateResult, TemplateRecord, NodePartDescriptor, AttributePartDescriptor, TextContentPartDescriptor } from './html.js';
+import type { TemplateResult, TemplateRecord, NodePartDescriptor, AttributePartDescriptor, TextContentPartDescriptor, TextTemplatePartDescriptor } from './html.js';
 import { getTemplateRecord, resolvePath } from './html.js';
-import { AttributePart, NodePart, TextContentPart } from './parts.js';
+import { AttributePart, NodePart, TextContentPart, TextTemplate } from './parts.js';
 import type { PartRuntime } from './runtime.js';
 import { getPartRuntime } from './runtime.js';
 
@@ -12,7 +12,7 @@ export interface TemplateInstance {
 
 type Part = NodePart | AttributePart | TextContentPart;
 
-type Descriptor = NodePartDescriptor | AttributePartDescriptor | TextContentPartDescriptor;
+type Descriptor = NodePartDescriptor | AttributePartDescriptor | TextContentPartDescriptor | TextTemplatePartDescriptor;
 
 export function instantiate(result: TemplateResult, runtime: PartRuntime = getPartRuntime()): TemplateInstance {
   const record = getTemplateRecord(result.strings);
@@ -46,7 +46,9 @@ export function instantiate(result: TemplateResult, runtime: PartRuntime = getPa
 }
 
 function createParts(descriptors: Descriptor[], fragment: DocumentFragment, runtime: PartRuntime): Part[] {
-  return descriptors.map(descriptor => {
+  const textTemplateCache = new Map<Descriptor, TextTemplate>();
+  
+  return descriptors.map((descriptor, index) => {
     if (!descriptor) {
       throw new Error('Missing template descriptor.');
     }
@@ -70,6 +72,34 @@ function createParts(descriptors: Descriptor[], fragment: DocumentFragment, runt
         throw new Error('TextContent descriptor did not resolve to an element.');
       }
       return new TextContentPart(element);
+    }
+    if (descriptor.type === 'textTemplate') {
+      // Get or create shared TextTemplate for this descriptor
+      let textTemplate = textTemplateCache.get(descriptor);
+      if (!textTemplate) {
+        textTemplate = new TextTemplate(descriptor.strings);
+        textTemplateCache.set(descriptor, textTemplate);
+      }
+      
+      // Find which slot this value index corresponds to
+      const slotIndex = descriptor.indices.indexOf(index);
+      if (slotIndex === -1) {
+        throw new Error('Value index not found in textTemplate descriptor indices.');
+      }
+      
+      const element = resolvePath(fragment, descriptor.path);
+      if (!(element instanceof Element)) {
+        throw new Error('TextTemplate descriptor did not resolve to an element.');
+      }
+      
+      if (descriptor.target === 'attribute') {
+        if (!descriptor.name) {
+          throw new Error('TextTemplate attribute descriptor missing name.');
+        }
+        return new AttributePart(element, descriptor.name, textTemplate, slotIndex);
+      } else {
+        return new TextContentPart(element, textTemplate, slotIndex);
+      }
     }
     throw new Error(`Unknown descriptor type: ${(descriptor as Descriptor).type}`);
   });

@@ -8,6 +8,29 @@ interface KeyedChild {
   dispose: () => void;
 }
 
+export class TextTemplate {
+  #strings: string[];
+  #values: unknown[];
+
+  constructor(strings: string[]) {
+    this.#strings = strings;
+    this.#values = new Array(strings.length - 1).fill('');
+  }
+
+  setSlot(index: number, value: unknown): void {
+    this.#values[index] = value;
+  }
+
+  render(): string {
+    let result = this.#strings[0];
+    for (let i = 0; i < this.#values.length; i++) {
+      result += String(this.#values[i] ?? '');
+      result += this.#strings[i + 1];
+    }
+    return result;
+  }
+}
+
 export class NodePart {
   #start: Comment;
   #end: Comment;
@@ -225,12 +248,16 @@ export class AttributePart {
   #isEvent: boolean;
   #element: Element;
   #name: string;
+  #textTemplate: TextTemplate | null = null;
+  #slotIndex: number = 0;
 
-  constructor(element: Element, name: string) {
+  constructor(element: Element, name: string, textTemplate?: TextTemplate, slotIndex?: number) {
     this.#element = element;
     this.#name = name;
     this.#isPropertyBinding = this.#name.startsWith('.');
     this.#isEvent = this.#name.startsWith('on');
+    this.#textTemplate = textTemplate ?? null;
+    this.#slotIndex = slotIndex ?? 0;
   }
 
   get isEvent(): boolean {
@@ -238,6 +265,11 @@ export class AttributePart {
   }
 
   setValue(value: unknown): void {
+    if (this.#textTemplate) {
+      this.#textTemplate.setSlot(this.#slotIndex, value);
+      this.#applyTextTemplate();
+      return;
+    }
     if (this.#isEvent) {
       this.#commitEvent(value);
       return;
@@ -258,6 +290,19 @@ export class AttributePart {
     this.#element.setAttribute(this.#name, String(value));
   }
 
+  #applyTextTemplate(): void {
+    if (!this.#textTemplate) {
+      return;
+    }
+    const rendered = this.#textTemplate.render();
+    if (this.#isPropertyBinding) {
+      const property = this.#name.slice(1);
+      (this.#element as unknown as Record<string, unknown>)[property] = rendered;
+      return;
+    }
+    this.#element.setAttribute(this.#name, rendered);
+  }
+
   #commitEvent(value: unknown): void {
     const eventName = this.#name.slice(2);
     if (this.#listener) {
@@ -273,12 +318,21 @@ export class AttributePart {
 
 export class TextContentPart {
   #element: Element;
+  #textTemplate: TextTemplate | null = null;
+  #slotIndex: number = 0;
 
-  constructor(element: Element) {
+  constructor(element: Element, textTemplate?: TextTemplate, slotIndex?: number) {
     this.#element = element;
+    this.#textTemplate = textTemplate ?? null;
+    this.#slotIndex = slotIndex ?? 0;
   }
 
   setValue(value: unknown): void {
+    if (this.#textTemplate) {
+      this.#textTemplate.setSlot(this.#slotIndex, value);
+      this.#element.textContent = this.#textTemplate.render();
+      return;
+    }
     this.#element.textContent = String(value ?? '');
   }
 }
