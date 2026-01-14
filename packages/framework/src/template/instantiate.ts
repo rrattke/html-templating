@@ -1,6 +1,6 @@
-import type { TemplateResult, TemplateRecord, NodePartDescriptor, AttributePartDescriptor } from './html.js';
+import type { TemplateResult, TemplateRecord, NodePartDescriptor, AttributePartDescriptor, TextContentPartDescriptor } from './html.js';
 import { getTemplateRecord, resolvePath } from './html.js';
-import { AttributePart, NodePart } from './parts.js';
+import { AttributePart, NodePart, TextContentPart } from './parts.js';
 import type { PartRuntime } from './runtime.js';
 import { getPartRuntime } from './runtime.js';
 
@@ -10,9 +10,9 @@ export interface TemplateInstance {
   dispose: () => void;
 }
 
-type Part = NodePart | AttributePart;
+type Part = NodePart | AttributePart | TextContentPart;
 
-type Descriptor = NodePartDescriptor | AttributePartDescriptor;
+type Descriptor = NodePartDescriptor | AttributePartDescriptor | TextContentPartDescriptor;
 
 export function instantiate(result: TemplateResult, runtime: PartRuntime = getPartRuntime()): TemplateInstance {
   const record = getTemplateRecord(result.strings);
@@ -63,6 +63,13 @@ function createParts(descriptors: Descriptor[], fragment: DocumentFragment, runt
         throw new Error('Attribute descriptor did not resolve to an element.');
       }
       return new AttributePart(element, descriptor.name);
+    }
+    if (descriptor.type === 'textContent') {
+      const element = resolvePath(fragment, descriptor.path);
+      if (!(element instanceof Element)) {
+        throw new Error('TextContent descriptor did not resolve to an element.');
+      }
+      return new TextContentPart(element);
     }
     throw new Error(`Unknown descriptor type: ${(descriptor as Descriptor).type}`);
   });

@@ -271,6 +271,18 @@ export class AttributePart {
   }
 }
 
+export class TextContentPart {
+  #element: Element;
+
+  constructor(element: Element) {
+    this.#element = element;
+  }
+
+  setValue(value: unknown): void {
+    this.#element.textContent = String(value ?? '');
+  }
+}
+
 function isIterable(value: unknown): value is Iterable<unknown> {
   if (typeof value === 'string') {
     return false;

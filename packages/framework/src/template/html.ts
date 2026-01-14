@@ -15,7 +15,7 @@ export interface TemplateRecord {
   clone(): DocumentFragment;
 }
 
-type PartDescriptor = NodePartDescriptor | AttributePartDescriptor;
+type PartDescriptor = NodePartDescriptor | AttributePartDescriptor | TextContentPartDescriptor;
 
 export interface NodePartDescriptor {
   type: 'node';
@@ -25,6 +25,11 @@ export interface NodePartDescriptor {
 export interface AttributePartDescriptor {
   type: 'attribute';
   name: string;
+  path: number[];
+}
+
+export interface TextContentPartDescriptor {
+  type: 'textContent';
   path: number[];
 }
 
@@ -105,7 +110,12 @@ function scanTemplateContent(fragment: DocumentFragment, descriptors: PartDescri
     if (node.nodeType === Node.COMMENT_NODE) {
       extractNodePart(node as Comment, fragment, descriptors);
     } else if (node.nodeType === Node.ELEMENT_NODE) {
-      extractAttributeParts(node as Element, fragment, descriptors);
+      const element = node as Element;
+      // Handle <style> and <script> tags specially
+      if (element.tagName === 'STYLE' || element.tagName === 'SCRIPT') {
+        extractTextContentPart(element, fragment, descriptors);
+      }
+      extractAttributeParts(element, fragment, descriptors);
     }
   }
 }
@@ -121,6 +131,29 @@ function extractNodePart(commentNode: Comment, root: DocumentFragment, descripto
     throw new Error('Invalid node marker index.');
   }
   descriptors[index] = { type: 'node', path: buildPath(commentNode, root) };
+}
+
+function extractTextContentPart(element: Element, root: DocumentFragment, descriptors: PartDescriptor[]): void {
+  const text = element.textContent || '';
+  const markerPattern = new RegExp(`<!--${NODE_MARKER_PREFIX}(\\d+)-->`, 'g');
+  const matches = [...text.matchAll(markerPattern)];
+  
+  if (matches.length > 0) {
+    // Remove all markers from the text content
+    let cleanedText = text;
+    for (const match of matches) {
+      const index = Number.parseInt(match[1], 10);
+      cleanedText = cleanedText.replace(match[0], '');
+      
+      // Create a descriptor that points to the element itself
+      // The runtime will handle setting textContent on the element
+      descriptors[index] = {
+        type: 'textContent',
+        path: buildPath(element, root)
+      };
+    }
+    element.textContent = cleanedText;
+  }
 }
 
 function extractAttributeParts(element: Element, root: DocumentFragment, descriptors: PartDescriptor[]): void {
