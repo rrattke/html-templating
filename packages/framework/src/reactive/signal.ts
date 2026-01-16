@@ -128,7 +128,7 @@ export function onCleanup(fn: CleanupFn): void {
 export type Memo<T> = () => T;
 
 export function createMemo<T>(fn: () => T): Memo<T> {
-  const [memo, setMemo] = createSignal<T>(undefined as T, { equals: false });
+  const [memo, setMemo] = createSignal<T>(fn(), { equals: false });
   createEffect(() => setMemo(fn()));
   return memo;
 }

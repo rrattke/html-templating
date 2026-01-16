@@ -1,4 +1,5 @@
-import { html, ReactiveElement, state } from '@vanishing/framework';
+import { ReactiveElement } from '@vanishing/framework';
+import { html, state } from '../runtime/solid-runtime.js';
 
 const listStyles = `
   :host {
@@ -86,7 +87,7 @@ export class SolidSignalsList extends ReactiveElement {
     this.items = this.items.filter(item => item !== label);
   }
 
-  protected template() {
+  template() {
     return html`
       <style>${listStyles}</style>
       <header>

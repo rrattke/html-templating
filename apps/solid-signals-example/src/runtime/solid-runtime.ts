@@ -7,8 +7,8 @@ import {
   untrack as solidUntrack,
   onCleanup as solidOnCleanup
 } from 'solid-js';
-import type { PartRuntime } from '@vanishing/framework';
-import { setPartRuntime } from '@vanishing/framework';
+import { StateDecorator } from '@vanishing/framework/wc';
+import { PartRuntime, TemplateBinding } from '@vanishing/framework/template';
 
 export const solidRuntime: PartRuntime = {
   effect(run) {
@@ -34,5 +34,5 @@ export const solidRuntime: PartRuntime = {
   }
 };
 
-// Set as default runtime immediately when this module loads
-setPartRuntime(solidRuntime);
+export const html = TemplateBinding.with(solidRuntime);
+export const state = StateDecorator.with(solidRuntime);

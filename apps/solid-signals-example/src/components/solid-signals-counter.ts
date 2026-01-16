@@ -1,4 +1,5 @@
-import { html, ReactiveElement, state } from '@vanishing/framework';
+import { ReactiveElement } from '@vanishing/framework';
+import { html, state } from '../runtime/solid-runtime.js';
 
 const counterStyles = `
   :host {
@@ -61,7 +62,7 @@ export class SolidSignalsCounter extends ReactiveElement {
   @state
   accessor count = 2;
 
-  protected template() {
+  template() {
     return html`
       <style>${counterStyles}</style>
       <header>

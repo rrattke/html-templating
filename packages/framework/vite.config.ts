@@ -12,7 +12,12 @@ export default defineConfig({
   },
   build: {
     lib: {
-      entry: path.resolve(dirname, 'src/index.ts'),
+      entry: {
+        index: path.resolve(dirname, 'src/index.ts'),
+        reactive: path.resolve(dirname, 'src/reactive.ts'),
+        template: path.resolve(dirname, 'src/template.ts'),
+        wc: path.resolve(dirname, 'src/wc.ts')
+      },
       formats: ['es']
     },
     outDir: 'lib',
@@ -21,7 +26,8 @@ export default defineConfig({
     target: 'es2022',
     rollupOptions: {
       output: {
-        entryFileNames: 'index.js'
+        entryFileNames: '[name].js',
+        preserveModules: false
       }
     }
   },
@@ -30,7 +36,8 @@ export default defineConfig({
       tsconfigPath: path.resolve(dirname, 'tsconfig.json'),
       outDir: 'lib',
       insertTypesEntry: true,
-      exclude: ['**/*.spec.ts', '**/*.test.ts']
+      exclude: ['**/*.spec.ts', '**/*.test.ts'],
+      rollupTypes: false
     })
   ]
 });

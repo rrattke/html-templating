@@ -1,5 +1,6 @@
-import { createEffect, createSignal, createMemo, batch, untrack, onCleanup } from '@vanishing/framework';
-import { setPartRuntime, type PartRuntime } from '@vanishing/framework';
+import { StateDecorator } from '@vanishing/framework/wc';
+import { createEffect, createSignal, createMemo, batch, untrack, onCleanup } from '@vanishing/framework/reactive';
+import { TemplateBinding, type PartRuntime } from '@vanishing/framework/template';
 
 // Define the native signal runtime
 export const nativeRuntime: PartRuntime = {
@@ -11,5 +12,5 @@ export const nativeRuntime: PartRuntime = {
   onCleanup: fn => onCleanup(fn)
 };
 
-// Set as default runtime immediately when this module loads
-setPartRuntime(nativeRuntime);
+export const html = TemplateBinding.with(nativeRuntime);
+export const state = StateDecorator.with(nativeRuntime);

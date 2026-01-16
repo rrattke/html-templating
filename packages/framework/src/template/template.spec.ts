@@ -1,20 +1,24 @@
 import { describe, it, expect } from 'vitest';
-import { html, getTemplateRecord, resolvePath } from './html.js';
+import { TemplateBinding, getPartsTemplate } from './instantiate.js';
+import { resolvePath } from './html.js';
+
+const dummyRuntime = { effect: (fn: () => void) => fn() } as any;
+const html = TemplateBinding.with(dummyRuntime);
 
 describe('html template function', () => {
   describe('template caching', () => {
     it('should cache templates for the same strings array', () => {
       const strings = ['<div>', '</div>'] as unknown as TemplateStringsArray;
-      const record1 = getTemplateRecord(strings);
-      const record2 = getTemplateRecord(strings);
+      const record1 = getPartsTemplate(strings);
+      const record2 = getPartsTemplate(strings);
       expect(record1).toBe(record2);
     });
 
     it('should create different records for different strings', () => {
       const strings1 = ['<div>', '</div>'] as unknown as TemplateStringsArray;
       const strings2 = ['<span>', '</span>'] as unknown as TemplateStringsArray;
-      const record1 = getTemplateRecord(strings1);
-      const record2 = getTemplateRecord(strings2);
+      const record1 = getPartsTemplate(strings1);
+      const record2 = getPartsTemplate(strings2);
       expect(record1).not.toBe(record2);
     });
   });
@@ -22,7 +26,7 @@ describe('html template function', () => {
   describe('node parts', () => {
     it('should create descriptor for single node part', () => {
       const strings = ['<div>', '</div>'] as unknown as TemplateStringsArray;
-      const record = getTemplateRecord(strings);
+      const record = getPartsTemplate(strings);
       
       expect(record.descriptors).toHaveLength(1);
       expect(record.descriptors[0].type).toBe('node');
@@ -30,7 +34,7 @@ describe('html template function', () => {
 
     it('should create descriptors for multiple node parts', () => {
       const strings = ['<div>', ' ', '</div>'] as unknown as TemplateStringsArray;
-      const record = getTemplateRecord(strings);
+      const record = getPartsTemplate(strings);
       
       expect(record.descriptors).toHaveLength(2);
       expect(record.descriptors[0].type).toBe('node');
@@ -39,9 +43,9 @@ describe('html template function', () => {
 
     it('should create correct path for nested node part', () => {
       const strings = ['<div><span>', '</span></div>'] as unknown as TemplateStringsArray;
-      const record = getTemplateRecord(strings);
+      const record = getPartsTemplate(strings);
       
-      const fragment = record.clone();
+      const fragment = record.cloneFragment();
       const node = resolvePath(fragment, record.descriptors[0].path);
       expect(node.nodeType).toBe(Node.COMMENT_NODE);
       expect(node.parentElement?.tagName).toBe('SPAN');
@@ -51,7 +55,7 @@ describe('html template function', () => {
   describe('attribute parts', () => {
     it('should create descriptor for attribute part', () => {
       const strings = ['<div class=', '></div>'] as unknown as TemplateStringsArray;
-      const record = getTemplateRecord(strings);
+      const record = getPartsTemplate(strings);
       
       expect(record.descriptors).toHaveLength(1);
       expect(record.descriptors[0].type).toBe('attribute');
@@ -62,16 +66,16 @@ describe('html template function', () => {
 
     it('should remove attribute marker from element', () => {
       const strings = ['<div class=', '></div>'] as unknown as TemplateStringsArray;
-      const record = getTemplateRecord(strings);
+      const record = getPartsTemplate(strings);
       
-      const fragment = record.clone();
+      const fragment = record.cloneFragment();
       const div = fragment.querySelector('div');
       expect(div?.hasAttribute('class')).toBe(false);
     });
 
     it('should create descriptors for multiple attributes', () => {
       const strings = ['<div class=', ' id=', '></div>'] as unknown as TemplateStringsArray;
-      const record = getTemplateRecord(strings);
+      const record = getPartsTemplate(strings);
       
       expect(record.descriptors).toHaveLength(2);
       expect(record.descriptors[0].type).toBe('attribute');
@@ -86,9 +90,9 @@ describe('html template function', () => {
 
     it('should resolve attribute part path correctly', () => {
       const strings = ['<div class=', '></div>'] as unknown as TemplateStringsArray;
-      const record = getTemplateRecord(strings);
+      const record = getPartsTemplate(strings);
       
-      const fragment = record.clone();
+      const fragment = record.cloneFragment();
       const node = resolvePath(fragment, record.descriptors[0].path);
       expect(node.nodeType).toBe(Node.ELEMENT_NODE);
       expect((node as Element).tagName).toBe('DIV');
@@ -103,58 +107,58 @@ describe('html template function', () => {
       
       // For now, just document that this doesn't throw
       // TODO: Add better validation for this edge case
-      const record = getTemplateRecord(strings);
-      expect(record.descriptors.length).toBeGreaterThan(0);
+      const template = getPartsTemplate(strings);
+      expect(template.descriptors.length).toBeGreaterThan(0);
     });
 
     it('should create TextTemplatePartDescriptor for multiple expressions in one attribute', () => {
       const strings = ['<div class="', ' ', '">',  '</div>'] as unknown as TemplateStringsArray;
-      const record = getTemplateRecord(strings);
+      const template = getPartsTemplate(strings);
       
-      expect(record.descriptors).toHaveLength(3); // 3 strings means 2 expressions
-      expect(record.descriptors[0].type).toBe('textTemplate');
-      expect(record.descriptors[1].type).toBe('textTemplate');
-      expect(record.descriptors[2].type).toBe('node'); // The closing tag
+      expect(template.descriptors).toHaveLength(3); // 3 strings means 2 expressions
+      expect(template.descriptors[0].type).toBe('textTemplate');
+      expect(template.descriptors[1].type).toBe('textTemplate');
+      expect(template.descriptors[2].type).toBe('node'); // The closing tag
       
       // First two should reference the same descriptor
-      expect(record.descriptors[0]).toBe(record.descriptors[1]);
+      expect(template.descriptors[0]).toBe(template.descriptors[1]);
       
-      if (record.descriptors[0].type === 'textTemplate') {
-        expect(record.descriptors[0].target).toBe('attribute');
-        expect(record.descriptors[0].name).toBe('class');
-        expect(record.descriptors[0].strings).toEqual(['', ' ', '']);
-        expect(record.descriptors[0].indices).toEqual([0, 1]);
+      if (template.descriptors[0].type === 'textTemplate') {
+        expect(template.descriptors[0].target).toBe('attribute');
+        expect(template.descriptors[0].name).toBe('class');
+        expect(template.descriptors[0].strings).toEqual(['', ' ', '']);
+        expect(template.descriptors[0].indices).toEqual([0, 1]);
       }
     });
 
     it('should create TextTemplatePartDescriptor for mixed static and dynamic attribute', () => {
       const strings = ['<div class="prefix-', '-suffix">', '</div>'] as unknown as TemplateStringsArray;
-      const record = getTemplateRecord(strings);
+      const template = getPartsTemplate(strings);
       
-      expect(record.descriptors).toHaveLength(2); // 2 strings means 1 expression  + 1 node
-      expect(record.descriptors[0].type).toBe('textTemplate');
-      expect(record.descriptors[1].type).toBe('node');
+      expect(template.descriptors).toHaveLength(2); // 2 strings means 1 expression  + 1 node
+      expect(template.descriptors[0].type).toBe('textTemplate');
+      expect(template.descriptors[1].type).toBe('node');
       
-      if (record.descriptors[0].type === 'textTemplate') {
-        expect(record.descriptors[0].target).toBe('attribute');
-        expect(record.descriptors[0].name).toBe('class');
-        expect(record.descriptors[0].strings).toEqual(['prefix-', '-suffix']);
-        expect(record.descriptors[0].indices).toEqual([0]);
+      if (template.descriptors[0].type === 'textTemplate') {
+        expect(template.descriptors[0].target).toBe('attribute');
+        expect(template.descriptors[0].name).toBe('class');
+        expect(template.descriptors[0].strings).toEqual(['prefix-', '-suffix']);
+        expect(template.descriptors[0].indices).toEqual([0]);
       }
     });
 
     it('should create TextTemplatePartDescriptor for three expressions in attribute', () => {
       const strings = ['<div class="', ' ', ' ', '">', '</div>'] as unknown as TemplateStringsArray;
-      const record = getTemplateRecord(strings);
+      const template = getPartsTemplate(strings);
       
-      expect(record.descriptors).toHaveLength(4); // 4 strings means 3 expressions + 1 node
-      expect(record.descriptors[0]).toBe(record.descriptors[1]);
-      expect(record.descriptors[1]).toBe(record.descriptors[2]);
-      expect(record.descriptors[3].type).toBe('node'); // closing tag
+      expect(template.descriptors).toHaveLength(4); // 4 strings means 3 expressions + 1 node
+      expect(template.descriptors[0]).toBe(template.descriptors[1]);
+      expect(template.descriptors[1]).toBe(template.descriptors[2]);
+      expect(template.descriptors[3].type).toBe('node'); // closing tag
       
-      if (record.descriptors[0].type === 'textTemplate') {
-        expect(record.descriptors[0].strings).toEqual(['', ' ', ' ', '']);
-        expect(record.descriptors[0].indices).toEqual([0, 1, 2]);
+      if (template.descriptors[0].type === 'textTemplate') {
+        expect(template.descriptors[0].strings).toEqual(['', ' ', ' ', '']);
+        expect(template.descriptors[0].indices).toEqual([0, 1, 2]);
       }
     });
   });
@@ -162,13 +166,13 @@ describe('html template function', () => {
   describe('style tag handling', () => {
     it('should handle dynamic content in style tags', () => {
       const strings = ['<style>', '</style>'] as unknown as TemplateStringsArray;
-      const record = getTemplateRecord(strings);
+      const template = getPartsTemplate(strings);
       
-      expect(record.descriptors).toHaveLength(1);
-      expect(record.descriptors[0]).toBeDefined();
-      expect(record.descriptors[0].type).toBe('textContent');
+      expect(template.descriptors).toHaveLength(1);
+      expect(template.descriptors[0]).toBeDefined();
+      expect(template.descriptors[0].type).toBe('textContent');
       
-      const fragment = record.clone();
+      const fragment = template.cloneFragment();
       const style = fragment.querySelector('style');
       // The marker should be removed from the text content
       expect(style?.textContent).toBe('');
@@ -176,10 +180,10 @@ describe('html template function', () => {
 
     it('should resolve path to style element for text content replacement', () => {
       const strings = ['<style>', '</style>'] as unknown as TemplateStringsArray;
-      const record = getTemplateRecord(strings);
+      const template = getPartsTemplate(strings);
       
-      const fragment = record.clone();
-      const node = resolvePath(fragment, record.descriptors[0].path);
+      const fragment = template.cloneFragment();
+      const node = resolvePath(fragment, template.descriptors[0].path);
       // The path should point to the style element itself
       expect(node.nodeType).toBe(Node.ELEMENT_NODE);
       expect((node as Element).tagName).toBe('STYLE');
@@ -187,34 +191,34 @@ describe('html template function', () => {
 
     it('should create TextTemplatePartDescriptor for multiple expressions in style tag', () => {
       const strings = ['<style>', ' ', '</style>'] as unknown as TemplateStringsArray;
-      const record = getTemplateRecord(strings);
+      const template = getPartsTemplate(strings);
       
-      expect(record.descriptors).toHaveLength(2);
-      expect(record.descriptors[0].type).toBe('textTemplate');
-      expect(record.descriptors[1].type).toBe('textTemplate');
-      expect(record.descriptors[0]).toBe(record.descriptors[1]);
+      expect(template.descriptors).toHaveLength(2);
+      expect(template.descriptors[0].type).toBe('textTemplate');
+      expect(template.descriptors[1].type).toBe('textTemplate');
+      expect(template.descriptors[0]).toBe(template.descriptors[1]);
       
-      if (record.descriptors[0].type === 'textTemplate') {
-        expect(record.descriptors[0].target).toBe('textContent');
-        expect(record.descriptors[0].strings).toEqual(['', ' ', '']);
-        expect(record.descriptors[0].indices).toEqual([0, 1]);
+      if (template.descriptors[0].type === 'textTemplate') {
+        expect(template.descriptors[0].target).toBe('textContent');
+        expect(template.descriptors[0].strings).toEqual(['', ' ', '']);
+        expect(template.descriptors[0].indices).toEqual([0, 1]);
       }
     });
 
     it('should create TextTemplatePartDescriptor for mixed static and dynamic in style', () => {
       const strings = ['<style>:host { color: ', '; background: ', '; }</style>'] as unknown as TemplateStringsArray;
-      const record = getTemplateRecord(strings);
+      const template = getPartsTemplate(strings);
       
-      expect(record.descriptors).toHaveLength(2);
-      expect(record.descriptors[0]).toBe(record.descriptors[1]);
+      expect(template.descriptors).toHaveLength(2);
+      expect(template.descriptors[0]).toBe(template.descriptors[1]);
       
-      if (record.descriptors[0].type === 'textTemplate') {
-        expect(record.descriptors[0].target).toBe('textContent');
-        expect(record.descriptors[0].strings).toEqual([':host { color: ', '; background: ', '; }']);
-        expect(record.descriptors[0].indices).toEqual([0, 1]);
+      if (template.descriptors[0].type === 'textTemplate') {
+        expect(template.descriptors[0].target).toBe('textContent');
+        expect(template.descriptors[0].strings).toEqual([':host { color: ', '; background: ', '; }']);
+        expect(template.descriptors[0].indices).toEqual([0, 1]);
       }
       
-      const fragment = record.clone();
+      const fragment = template.cloneFragment();
       const style = fragment.querySelector('style');
       expect(style?.textContent).toBe(':host { color: ; background: ; }');
     });
@@ -223,11 +227,11 @@ describe('html template function', () => {
   describe('mixed content', () => {
     it('should handle both node and attribute parts', () => {
       const strings = ['<div class=', '>', '</div>'] as unknown as TemplateStringsArray;
-      const record = getTemplateRecord(strings);
+      const template = getPartsTemplate(strings);
       
-      expect(record.descriptors).toHaveLength(2);
-      expect(record.descriptors[0].type).toBe('attribute');
-      expect(record.descriptors[1].type).toBe('node');
+      expect(template.descriptors).toHaveLength(2);
+      expect(template.descriptors[0].type).toBe('attribute');
+      expect(template.descriptors[1].type).toBe('node');
     });
 
     it('should handle complex nested structure', () => {
@@ -238,35 +242,35 @@ describe('html template function', () => {
         '>',
         '</p></div>'
       ] as unknown as TemplateStringsArray;
-      const record = getTemplateRecord(strings);
+      const template = getPartsTemplate(strings);
       
-      expect(record.descriptors).toHaveLength(4);
-      expect(record.descriptors[0].type).toBe('attribute');
-      expect(record.descriptors[1].type).toBe('node');
-      expect(record.descriptors[2].type).toBe('attribute');
-      expect(record.descriptors[3].type).toBe('node');
+      expect(template.descriptors).toHaveLength(4);
+      expect(template.descriptors[0].type).toBe('attribute');
+      expect(template.descriptors[1].type).toBe('node');
+      expect(template.descriptors[2].type).toBe('attribute');
+      expect(template.descriptors[3].type).toBe('node');
     });
   });
 
   describe('TemplateResult', () => {
     it('should create template result with strings and values', () => {
-      const result = html`<div>${'test'}</div>`;
+      const template = html`<div>${'test'}</div>`;
       
-      expect(result.strings).toHaveLength(2);
-      expect(result.values).toEqual(['test']);
+      expect(template.strings).toHaveLength(2);
+      expect(template.values).toEqual(['test']);
     });
 
     it('should support setting keys', () => {
-      const result = html`<div>test</div>`.setKey('unique-key');
+      const template = html`<div>test</div>`.setKey('unique-key');
       
-      expect(result.key).toBe('unique-key');
+      expect(template.key).toBe('unique-key');
     });
 
     it('should chain setKey method', () => {
-      const result = html`<div>test</div>`;
-      const keyed = result.setKey('key');
+      const template = html`<div>test</div>`;
+      const keyed = template.setKey('key');
       
-      expect(keyed).toBe(result);
+      expect(keyed).toBe(template);
     });
   });
 

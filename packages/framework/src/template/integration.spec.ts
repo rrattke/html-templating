@@ -1,27 +1,27 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { html } from './html.js';
-import { instantiate } from './instantiate.js';
-import { setPartRuntime } from './runtime.js';
+import { TemplateBinding } from './instantiate.js';
 
 describe('integration tests', () => {
   let container: HTMLElement;
+  let html: ReturnType<typeof TemplateBinding.with>;
 
   beforeEach(() => {
     container = document.createElement('div');
     document.body.appendChild(container);
     
     // Set a simple runtime for non-reactive tests
-    setPartRuntime({
+    const runtime = {
       effect: (fn: () => void) => fn()
-    } as any);
+    } as any;
+    html = TemplateBinding.with(runtime);
   });
 
   describe('style tag with dynamic content', () => {
     it('should render static CSS in style tag', () => {
       const css = ':host { color: red; }';
-      const result = html`<style>${css}</style>`;
+      const template = html`<style>${css}</style>`;
       
-      const instance = instantiate(result);
+      const instance = template.instance();
       container.appendChild(instance.fragment);
       
       const style = container.querySelector('style');
@@ -32,9 +32,9 @@ describe('integration tests', () => {
     it('should render variable CSS in style tag', () => {
       const primaryColor = 'blue';
       const css = `:host { color: ${primaryColor}; }`;
-      const result = html`<style>${css}</style>`;
+      const template = html`<style>${css}</style>`;
       
-      const instance = instantiate(result);
+      const instance = template.instance();
       container.appendChild(instance.fragment);
       
       const style = container.querySelector('style');
@@ -44,9 +44,9 @@ describe('integration tests', () => {
     it('should not treat style content as reactive', () => {
       const css = ':host { color: blue; }';
       // Not a function, so shouldn't be reactive
-      const result = html`<style>${css}</style>`;
+      const template = html`<style>${css}</style>`;
       
-      const instance = instantiate(result);
+      const instance = template.instance();
       container.appendChild(instance.fragment);
       
       const style = container.querySelector('style');
@@ -59,9 +59,9 @@ describe('integration tests', () => {
       const css = ':host { color: red; }';
       const message = 'Hello';
       
-      const result = html`<style>${css}</style><p>${message}</p>`;
+      const template = html`<style>${css}</style><p>${message}</p>`;
       
-      const instance = instantiate(result);
+      const instance = template.instance();
       container.appendChild(instance.fragment);
       
       const style = container.querySelector('style');
@@ -76,9 +76,9 @@ describe('integration tests', () => {
     it('should render multiple expressions in one attribute', () => {
       const class1 = 'foo';
       const class2 = 'bar';
-      const result = html`<div class="${class1} ${class2}"></div>`;
+      const template = html`<div class="${class1} ${class2}"></div>`;
       
-      const instance = instantiate(result);
+      const instance = template.instance();
       container.appendChild(instance.fragment);
       
       const div = container.querySelector('div');
@@ -87,9 +87,9 @@ describe('integration tests', () => {
 
     it('should render mixed static and dynamic in attribute', () => {
       const theme = 'dark';
-      const result = html`<div class="prefix-${theme}-suffix"></div>`;
+      const template = html`<div class="prefix-${theme}-suffix"></div>`;
       
-      const instance = instantiate(result);
+      const instance = template.instance();
       container.appendChild(instance.fragment);
       
       const div = container.querySelector('div');
@@ -99,9 +99,9 @@ describe('integration tests', () => {
     it('should render multiple expressions in style tag', () => {
       const color = 'blue';
       const bgColor = 'white';
-      const result = html`<style>:host { color: ${color}; background: ${bgColor}; }</style>`;
+      const template = html`<style>:host { color: ${color}; background: ${bgColor}; }</style>`;
       
-      const instance = instantiate(result);
+      const instance = template.instance();
       container.appendChild(instance.fragment);
       
       const style = container.querySelector('style');
@@ -111,20 +111,20 @@ describe('integration tests', () => {
     it('should update all slots when values change', () => {
       let class1 = 'initial1';
       let class2 = 'initial2';
-      
-      const result = html`<div class="${() => class1} ${() => class2}"></div>`;
-      
+
       // Set up reactive runtime
       const effects: Array<() => void> = [];
-      setPartRuntime({
+      const reactiveRuntime = {
         effect: (fn: () => void) => {
           effects.push(fn);
           fn(); // Run initially
           return () => {};
         }
-      } as any);
-      
-      const instance = instantiate(result);
+      } as any;
+      const html = TemplateBinding.with(reactiveRuntime);
+      const template = html`<div class="${() => class1} ${() => class2}"></div>`;
+            
+      const instance = template.instance();
       container.appendChild(instance.fragment);
       
       const div = container.querySelector('div');
@@ -139,9 +139,9 @@ describe('integration tests', () => {
     });
 
     it('should handle null and undefined in multi-expression templates', () => {
-      const result = html`<div class="${null} ${undefined} valid"></div>`;
+      const template = html`<div class="${null} ${undefined} valid"></div>`;
       
-      const instance = instantiate(result);
+      const instance = template.instance();
       container.appendChild(instance.fragment);
       
       const div = container.querySelector('div');
@@ -151,9 +151,9 @@ describe('integration tests', () => {
     it('should convert values to strings in multi-expression templates', () => {
       const num = 42;
       const bool = true;
-      const result = html`<div data-values="${num} ${bool}"></div>`;
+      const template = html`<div data-values="${num} ${bool}"></div>`;
       
-      const instance = instantiate(result);
+      const instance = template.instance();
       container.appendChild(instance.fragment);
       
       const div = container.querySelector('div');

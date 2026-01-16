@@ -5,13 +5,13 @@ This document explains how the framework turns `html` tagged templates into live
 ## 1. High-Level Flow
 
 ```text
-(template literal) --> html() --> TemplateResult
+(template literal) --> html() --> TemplateBinding
                           |
                           v
-                  getTemplateRecord()
+                  getPartsTemplate()
                           |
                           v
-                 instantiate(result)
+                binding.instance()
                           |
                           v
               NodePart/AttributePart setValue()
@@ -38,10 +38,11 @@ const card = html`
 
 ### What `html` Produces
 
-- A `TemplateResult` containing
+- A `TemplateBinding` containing
   - `strings`: the static literal chunks.
   - `values`: the dynamic expressions.
-- A cached `TemplateRecord` per unique `strings` array.
+  - `runtime`: the reactive runtime to use for effects.
+- A cached `PartsTemplate` per unique `strings` array.
 
 ## 3. Template Parsing and Caching
 
@@ -73,34 +74,35 @@ sequenceDiagram
     App->>HTML: html`<div>${val}</div>`
     HTML->>Cache: check(strings)
     alt Cache Miss
-        Cache->>Parser: createTemplateRecord(strings)
-        Parser->>Parser: buildHTML with Markers
+        Cache->>Parser: createPartsTemplate(strings)
+        Parser->>Parser: createTemplateDescriptor with Markers
         Parser->>Parser: document.createElement('template')
         Parser->>Parser: scanTemplateContent(TreeWalker)
-        Parser-->>Cache: return TemplateRecord
+        Parser-->>Cache: return PartsTemplate
     end
-    Cache-->>HTML: return TemplateRecord
-    HTML-->>App: return TemplateResult
+    Cache-->>HTML: return PartsTemplate
+    HTML-->>App: return TemplateBinding
 ```
 
-## 4. Instantiation (`instantiate`)
+## 4. Instantiation (`.instance()`)
 
-`instantiate(result, runtime)` wires a `TemplateResult` to a `PartRuntime`:
+`binding.instance()` creates a live DOM instance from a `TemplateBinding`:
 
-1. Loads the cached `TemplateRecord` for the `result.strings`.
-2. Clones the record’s `DocumentFragment`.
+1. Loads the cached `PartsTemplate` for the `binding.strings`.
+2. Clones the template's `DocumentFragment`.
 3. Reconstructs real `NodePart` and `AttributePart` instances by resolving descriptor paths against the clone.
-4. Iterates through `result.values`:
+4. Iterates through `binding.values`:
    - Functions (signals/effects) become tracked reactions via `runtime.effect`.
+   - Event handlers get their own disposal tracking.
    - All other values are written once.
-5. Returns `{ fragment, parts, dispose }`, where `dispose` tears down every effect the runtime created.
+5. Returns `{ fragment, parts, dispose }`, where `dispose` tears down every effect and cleans up event listeners.
 
 ### Visualizing Instantiation
 
 ```mermaid
 flowchart TD
-    A[TemplateResult] --> B{Check Cache}
-    B -- Found --> C[Get TemplateRecord]
+    A[TemplateBinding] --> B{Check Cache}
+    B -- Found --> C[Get PartsTemplate]
     B -- New --> D[Create & Parse]
     D --> C
     C --> E[Clone DOM Fragment]
@@ -124,7 +126,7 @@ flowchart TD
 - Supports:
   - Text (`string` / `number`)
   - DOM nodes
-  - Nested `TemplateResult` instances (recursively instantiated)
+  - Nested `TemplateBinding` instances (recursively instantiated)
   - Iterables (lists of primitives, nodes, or templates)
   - `null` / `false` (clears the part)
 - Tracks child template disposers so nested templates clean up when their parent changes.
@@ -140,17 +142,33 @@ flowchart TD
 
 ## 6. Reactive Runtime Adapter
 
-`PartRuntime` is an interface with a single method:
+`PartRuntime` is an interface that provides reactive primitives:
 
 ```ts
 interface PartRuntime {
   effect(run: () => void): () => void;
+  createSignal<T>(initial: T): Signal<T>;
+  createMemo<T>(fn: () => T): Memo<T>;
+  batch<T>(fn: () => T): T;
+  untrack<T>(fn: () => T): T;
+  onCleanup(fn: () => void): void;
 }
 ```
 
-- The default runtime wraps `createEffect` from the bundled signal system.
-- You can call `setPartRuntime(customRuntime)` globally or override `protected partRuntime()` inside `ReactiveElement` to plug in Solid, Preact Signals, etc.
-- `instantiate` always uses the runtime supplied (or the global default), so nested templates inherit the same adapter automatically.
+- Create runtime-specific template functions using `TemplateBinding.with(runtime)`:
+
+  ```ts
+  export const html = TemplateBinding.with(myRuntime);
+  ```
+
+- Create runtime-specific state decorators using `StateDecorator.with(runtime)`:
+
+  ```ts
+  export const state = StateDecorator.with(myRuntime);
+  ```
+
+- Each `TemplateBinding` carries its runtime, so nested templates inherit it automatically.
+- No global state—each component can use a different runtime if needed.
 
 ### Reactive Lifecycles
 
@@ -163,7 +181,7 @@ The runtime decides when to re-run `part.setValue`, ensuring updates target only
 
 ## 7. Nested Templates & Lists
 
-Because `NodePart` understands `TemplateResult` values and generic iterables, you can compose declarative lists without manual DOM work:
+Because `NodePart` understands `TemplateBinding` values and generic iterables, you can compose declarative lists without manual DOM work:
 
 ```ts
 html`
@@ -182,21 +200,21 @@ html`
 - The parent `NodePart` tracks all child disposers, so removing or reordering items cleans up effects immediately.
 - Iterables can be nested arbitrarily; values that are `null`/`false` are skipped automatically.
 
-### Keyed Lists (Arrow-style reuse)
+### Keyed Lists
 
 If you want to keep DOM nodes/effects alive while reordering or splicing lists, wrap each item in the exported `keyed()` helper so `NodePart` can reconcile by key:
 
 ```ts
-import { html, keyed } from '@vanishing/framework';
+import { html, state } from '../runtime/native-runtime.js';
 
 html`
   <ul>
-    ${() => items().map(item => keyed(item.id, html`
+    ${() => items().map(item => html`
       <li>
         <span>${item.label}</span>
         <button onclick=${() => remove(item.id)}>Remove</button>
       </li>
-    `))}
+    `.setKey(item.id))}
   </ul>
 `;
 ```
@@ -204,31 +222,14 @@ html`
 - Existing keys keep their DOM and reactive disposers intact; only moved nodes are reordered, and removed keys are disposed.
 - Entries without `keyed()` still use the simpler “clear and rebuild” path, so this is fully opt-in.
 
-Prefer a shorthand? Use the `repeat()` helper which just returns an array of keyed templates for you:
-
-```ts
-import { html, repeat } from '@vanishing/framework';
-
-html`
-  <ul>
-    ${() => repeat(items(), item => item.id, item => html`
-      <li>${item.label}</li>
-    `)}
-  </ul>
-`;
-```
-
-- `repeat(iterable, keyFn, render)` works with any iterable.
-- `keyFn` must return a stable identifier per row; `render` returns the row template.
-
 ## 8. Putting It Together in `ReactiveElement`
 
 `ReactiveElement` subclasses typically:
 
-1. Declare signals/state in the constructor.
-2. Implement `protected template()` and return an `html` result.
+1. Declare signals/state using runtime-specific `@state` decorator.
+2. Implement `template()` and return a runtime-specific `html` result.
 3. Call `super.connectedCallback()` (handled automatically) which:
-   - Instantiates the template with `instantiate()`.
+   - Calls `binding.instance()` to create the DOM.
    - Mounts the fragment into the component’s shadow DOM.
    - Stores the disposer for `disconnectedCallback()`.
 
@@ -252,6 +253,11 @@ This lifecycle ensures templates are parsed once, mounted once, and then updated
 - Prefer functions for reactive expressions (`${() => count()}`) and plain values for static content.
 - Use property bindings or events for non-string attributes (`.value=${signal}` or `onclick=${handler}`).
 - Compose nested templates for lists instead of manual DOM APIs—the framework now handles disposal for you.
-- When integrating third-party reactive systems, implement the `PartRuntime` interface and supply it via `setPartRuntime` or `partRuntime()` overrides.
+- When integrating third-party reactive systems, implement the `PartRuntime` interface and create runtime-specific factories:
+
+  ```ts
+  export const html = TemplateBinding.with(myRuntime);
+  export const state = StateDecorator.with(myRuntime);
+  ```
 
 With these building blocks you can create lit-style declarative templates backed by Solid-style fine-grained reactivity while keeping the runtime tiny and explicit.

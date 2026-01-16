@@ -1,4 +1,5 @@
-import { html, ReactiveElement, state } from '@vanishing/framework';
+import { ReactiveElement } from '@vanishing/framework';
+import { html, state } from '../runtime/native-runtime.js';
 
 const counterStyles = `
   :host {
@@ -50,12 +51,11 @@ export class NativeCounter extends ReactiveElement {
   @state
   accessor count = 4;
 
-
   constructor() {
     super();
   }
 
-  protected template() {
+  template() {
     return html`
       <style>${counterStyles}</style>
       <header>Native Signals</header>

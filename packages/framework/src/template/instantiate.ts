@@ -1,8 +1,67 @@
-import type { TemplateResult, TemplateRecord, NodePartDescriptor, AttributePartDescriptor, TextContentPartDescriptor, TextTemplatePartDescriptor } from './html.js';
-import { getTemplateRecord, resolvePath } from './html.js';
-import { StandardAttributePart, PropertyAttributePart, EventAttributePart, TemplateAttributePart, NodePart, TextContentPart, TextTemplate, ATTRIBUTE_BINDING, PROPERTY_BINDING } from './parts.js';
+import type { NodePartDescriptor, AttributePartDescriptor, TextContentPartDescriptor, TextTemplatePartDescriptor } from './html.js';
+import { createTemplateDescriptor, resolvePath } from './html.js';
+import { PartsTemplate, StandardAttributePart, PropertyAttributePart, EventAttributePart, TemplateAttributePart, NodePart, TextContentPart, TextTemplate, ATTRIBUTE_BINDING, PROPERTY_BINDING } from './parts.js';
 import type { PartRuntime } from './runtime.js';
-import { getPartRuntime } from './runtime.js';
+
+const templateCache = new WeakMap<TemplateStringsArray, PartsTemplate>();
+
+export class TemplateBinding {
+  #strings: TemplateStringsArray;
+  #values: unknown[];
+  #runtime: PartRuntime;
+  key?: unknown;
+
+  constructor(strings: TemplateStringsArray, values: unknown[], runtime: PartRuntime) {
+    this.#strings = strings;
+    this.#values = values;
+    this.#runtime = runtime;
+  }
+
+  static with(runtime: PartRuntime): (strings: TemplateStringsArray, ...values: unknown[]) => TemplateBinding {
+    return (strings: TemplateStringsArray, ...values: unknown[]) => {
+      return new TemplateBinding(strings, values, runtime);
+    };
+  }
+
+  get strings(): TemplateStringsArray {
+    return this.#strings;
+  }
+
+  get values(): unknown[] {
+    return this.#values;
+  }
+
+  get runtime(): PartRuntime {
+    return this.#runtime;
+  }
+
+  setKey(keyValue: unknown): this {
+    this.key = keyValue;
+    return this;
+  }
+
+  instance() {
+    return create(this.#runtime, this.getTemplate(), this.#values);
+  }
+
+  getTemplate(): PartsTemplate {
+    return getPartsTemplate(this.#strings);
+  }
+}
+
+export function getPartsTemplate(strings: TemplateStringsArray): PartsTemplate {
+  let template = templateCache.get(strings);
+  if (!template) {
+    template = createPartsTemplate(strings);
+    templateCache.set(strings, template);
+  }
+  return template;
+}
+
+function createPartsTemplate(strings: readonly string[]): PartsTemplate {
+  const { template, descriptors } = createTemplateDescriptor(strings);
+  return new PartsTemplate(template, descriptors);
+}
 
 export interface TemplateInstance {
   fragment: DocumentFragment;
@@ -14,36 +73,40 @@ type Part = NodePart | StandardAttributePart | PropertyAttributePart | EventAttr
 
 type Descriptor = NodePartDescriptor | AttributePartDescriptor | TextContentPartDescriptor | TextTemplatePartDescriptor;
 
-export function instantiate(result: TemplateResult, runtime: PartRuntime = getPartRuntime()): TemplateInstance {
-  const record = getTemplateRecord(result.strings);
-  if (record.descriptors.length !== result.values.length) {
+export function create(runtime: PartRuntime, template: PartsTemplate, values: unknown[]): TemplateInstance  {
+  if (template.descriptors.length !== values.length) {
     throw new Error('Template part mismatch.');
   }
 
-  const fragment = record.clone();
-  const parts = createParts(record.descriptors, fragment, runtime);
+  const fragment = template.cloneFragment();
+  const parts = createParts(template.descriptors, fragment, runtime);
   const disposers: Array<() => void> = [];
 
   parts.forEach((part, index) => {
-    const value = result.values[index];
-    if (typeof value === 'function' && shouldTreatAsReactive(part)) {
-      const dispose = runtime.effect(() => {
-        part.setValue((value as () => unknown)());
-      });
-      disposers.push(dispose);
+    const value = values[index];
+    if (typeof value === 'function') {
+      if (part instanceof EventAttributePart) {
+        disposers.push(() => part.dispose());
+      }
+      else {
+        const dispose = runtime.effect(() => {
+          part.setValue(value());
+        });
+        disposers.push(dispose);
+      }
     } else {
       part.setValue(value);
     }
   });
 
   const dispose = () => {
-    for (const teardown of disposers) {
-      teardown();
+    for (const dispose of disposers) {
+      dispose();
     }
   };
 
   return { fragment, parts, dispose };
-}
+};
 
 function createParts(descriptors: Descriptor[], fragment: DocumentFragment, runtime: PartRuntime): Part[] {
   const textTemplateCache = new Map<Descriptor, TextTemplate>();
@@ -57,7 +120,7 @@ function createParts(descriptors: Descriptor[], fragment: DocumentFragment, runt
       if (!(marker instanceof Comment)) {
         throw new Error('Node descriptor did not resolve to a comment marker.');
       }
-      return new NodePart(marker, value => instantiate(value, runtime));
+      return new NodePart(marker);
     }
     if (descriptor.type === 'attribute') {
       const element = resolvePath(fragment, descriptor.path);
@@ -116,12 +179,4 @@ function createParts(descriptors: Descriptor[], fragment: DocumentFragment, runt
     }
     throw new Error(`Unknown descriptor type: ${(descriptor as Descriptor).type}`);
   });
-}
-
-function shouldTreatAsReactive(part: Part): boolean {
-  // Event handlers should not be wrapped in effects
-  if (part instanceof EventAttributePart) {
-    return false;
-  }
-  return true;
 }

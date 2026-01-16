@@ -8,6 +8,18 @@
     ".": {
       "import": "./lib/index.js",
       "types": "./lib/index.d.ts"
+    },
+    "./reactive": {
+      "import": "./lib/reactive.js",
+      "types": "./lib/reactive.d.ts"
+    },
+    "./template": {
+      "import": "./lib/template.js",
+      "types": "./lib/template.d.ts"
+    },
+    "./wc": {
+      "import": "./lib/wc.js",
+      "types": "./lib/wc.d.ts"
     }
   },
   "files": [

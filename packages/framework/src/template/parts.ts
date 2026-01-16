@@ -1,6 +1,23 @@
-import type { TemplateResult } from './html.js';
+import type { TemplateBinding } from './instantiate.js';
+import type { PartDescriptor } from './html.js';
+import type { PartRuntime } from './runtime.js';
 
-type TemplateFactory = (result: TemplateResult) => { fragment: DocumentFragment; dispose: () => void };
+export class PartsTemplate {
+  constructor(
+    public readonly template: HTMLTemplateElement,
+    public readonly descriptors: PartDescriptor[]
+  ) {}
+
+  cloneFragment(): DocumentFragment {
+    return this.template.content.cloneNode(true) as DocumentFragment;
+  }
+
+  createInstance(values: unknown[], runtime: PartRuntime): { fragment: DocumentFragment; dispose: () => void } {
+    // Implementation will be provided by instantiate.ts to avoid circular dependencies
+    // This method signature is defined here but actual implementation is in instantiate.ts
+    throw new Error('createInstance must be implemented - this should be patched by instantiate module');
+  }
+}
 
 interface KeyedChild {
   start: Comment;
@@ -73,16 +90,14 @@ export class NodePart {
   #start: Comment;
   #end: Comment;
   #current: Node | null = null;
-  #instantiateNested: TemplateFactory;
   #childDisposers: Array<() => void> = [];
   #keyedChildren: Map<unknown, KeyedChild> | null = null;
 
-  constructor(markerNode: Comment, instantiateNested: TemplateFactory) {
+  constructor(markerNode: Comment) {
     const doc = markerNode.ownerDocument;
     this.#start = doc.createComment('part-start');
     this.#end = doc.createComment('part-end');
     markerNode.replaceWith(this.#start, this.#end);
-    this.#instantiateNested = instantiateNested;
   }
 
   setValue(value: unknown): void {
@@ -94,8 +109,8 @@ export class NodePart {
     }
     if (isIterable(value)) {
       const entries = Array.from(value);
-      if (entries.every(e => isTemplateResult(e) && e.key !== undefined)) {
-        this.#commitKeyed(entries as TemplateResult[]);
+      if (entries.every(e => isTemplateBinding(e) && e.key !== undefined)) {
+        this.#commitKeyed(entries as TemplateBinding[]);
       } else {
         this.#clearKeyedState();
         this.#disposeChildren();
@@ -105,7 +120,7 @@ export class NodePart {
     }
     this.#clearKeyedState();
     this.#disposeChildren();
-    if (isTemplateResult(value)) {
+    if (isTemplateBinding(value)) {
       this.#commitTemplate(value);
       return;
     }
@@ -116,8 +131,8 @@ export class NodePart {
     this.#commitText(String(value));
   }
 
-  #commitTemplate(result: TemplateResult): void {
-    const instance = this.#instantiateNested(result);
+  #commitTemplate(binding: TemplateBinding): void {
+    const instance = binding.instance();
     this.#childDisposers.push(instance.dispose);
     this.#commitNode(instance.fragment);
   }
@@ -130,7 +145,7 @@ export class NodePart {
     this.#commitNode(fragment);
   }
 
-  #commitKeyed(entries: TemplateResult[]): void {
+  #commitKeyed(entries: TemplateBinding[]): void {
     const parent = this.#end.parentNode;
     if (!parent) {
       return;
@@ -149,12 +164,17 @@ export class NodePart {
       } else {
         const child = this.#createKeyedChild(entry, anchor);
         this.#keyedChildren.set(entry.key!, child);
+        this.#childDisposers.push(child.dispose);
         anchor = child.start;
       }
       seen.add(entry.key!);
     }
     for (const [key, child] of Array.from(this.#keyedChildren.entries())) {
       if (!seen.has(key)) {
+        const disposeIndex = this.#childDisposers.indexOf(child.dispose);
+        if (disposeIndex !== -1) {
+          this.#childDisposers.splice(disposeIndex, 1);
+        }
         this.#removeKeyedChild(child);
         this.#keyedChildren.delete(key);
       }
@@ -166,8 +186,8 @@ export class NodePart {
     if (value == null || value === false) {
       return;
     }
-    if (isTemplateResult(value)) {
-      const instance = this.#instantiateNested(value);
+    if (isTemplateBinding(value)) {
+      const instance = value.instance();
       this.#childDisposers.push(instance.dispose);
       target.appendChild(instance.fragment);
       return;
@@ -237,8 +257,8 @@ export class NodePart {
     this.#current = null;
   }
 
-  #createKeyedChild(template: TemplateResult, anchor: ChildNode | null): KeyedChild {
-    const { fragment, dispose } = this.#instantiateNested(template);
+  #createKeyedChild(binding: TemplateBinding, anchor: ChildNode | null): KeyedChild {
+    const { fragment, dispose } = binding.instance();
     const doc = this.#end.ownerDocument;
     const start = doc.createComment('key-start');
     const end = doc.createComment('key-end');
@@ -346,6 +366,13 @@ export class EventAttributePart {
       this.#element.addEventListener(this.#eventName, this.#listener);
     }
   }
+
+  dispose(): void {
+    if (this.#listener) {
+      this.#element.removeEventListener(this.#eventName, this.#listener);
+      this.#listener = null;
+    }
+  }
 }
 
 /**
@@ -402,7 +429,7 @@ function isIterable(value: unknown): value is Iterable<unknown> {
   return value != null && typeof (value as Iterable<unknown>)[Symbol.iterator] === 'function';
 }
 
-function isTemplateResult(value: unknown): value is TemplateResult {
+function isTemplateBinding(value: unknown): value is TemplateBinding {
   if (value == null || typeof value !== 'object') {
     return false;
   }

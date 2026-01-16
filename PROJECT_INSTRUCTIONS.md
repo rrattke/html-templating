@@ -63,12 +63,13 @@ No diffing.
 No template re-evaluation.
 No virtual DOM.
 
-### 2.4 Runtime Adapters (New)
-- The template layer now depends on a tiny `PartRuntime` interface (`effect(run: () => void)`)
-- `instantiate(result, runtime?)` accepts any runtime implementation; defaults to the bundled signal runtime
-- `ReactiveElement` exposes `protected partRuntime()` so subclasses can override per-component
-- Framework exports `getPartRuntime`, `setPartRuntime`, and `getSignalRuntime` helpers to manage the default adapter
-- Component authors can swap to any reactive system by providing an adapter without touching template internals
+### 2.4 Runtime Adapters (Current)
+- The template layer depends on a `PartRuntime` interface with reactive primitives
+- `TemplateBinding.with(runtime)` creates a runtime-specific template function factory
+- `StateDecorator.with(runtime)` creates a runtime-specific state decorator
+- No global state—each binding carries its own runtime
+- Component authors import runtime-specific `html` and `state` from their runtime module
+- Example: `import { html, state } from '../runtime/native-runtime.js';`
 
 ---
 

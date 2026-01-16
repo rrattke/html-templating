@@ -2,20 +2,12 @@ const NODE_MARKER_PREFIX = 'part:';
 const ATTR_MARKER_PREFIX = '%%PART:';
 const ATTR_MARKER_SUFFIX = '%%';
 
-export interface TemplateResult {
-  strings: TemplateStringsArray;
-  values: unknown[];
-  key?: unknown;
-  setKey(keyValue: unknown): this;
-}
+export type PartDescriptor = NodePartDescriptor | AttributePartDescriptor | TextContentPartDescriptor | TextTemplatePartDescriptor;
 
-export interface TemplateRecord {
+export interface TemplateDescriptor {
   template: HTMLTemplateElement;
   descriptors: PartDescriptor[];
-  clone(): DocumentFragment;
 }
-
-type PartDescriptor = NodePartDescriptor | AttributePartDescriptor | TextContentPartDescriptor | TextTemplatePartDescriptor;
 
 export interface NodePartDescriptor {
   type: 'node';
@@ -42,62 +34,35 @@ export interface TextTemplatePartDescriptor {
   indices: number[]; // which value indices correspond to this template
 }
 
-const templateCache = new WeakMap<TemplateStringsArray, TemplateRecord>();
-
-export function html(strings: TemplateStringsArray, ...values: unknown[]): TemplateResult {
-  return new TemplateResultImpl(strings, values);
-}
-
-class TemplateResultImpl implements TemplateResult {
-  key?: unknown;
-
-  constructor(public strings: TemplateStringsArray, public values: unknown[]) {}
-
-  setKey(keyValue: unknown): this {
-    this.key = keyValue;
-    return this;
-  }
-}
-
-export function getTemplateRecord(strings: TemplateStringsArray): TemplateRecord {
-  let record = templateCache.get(strings);
-  if (!record) {
-    record = createTemplateRecord(strings);
-    templateCache.set(strings, record);
-  }
-  return record;
-}
-
-function createTemplateRecord(strings: TemplateStringsArray): TemplateRecord {
-  const template = document.createElement('template');
-  template.innerHTML = buildHTML(strings);
+export function createTemplateDescriptor(strings: readonly string[]): TemplateDescriptor {
+  const template = createHtmlTemplate(strings);
   const partCount = strings.length - 1;
   const descriptors: PartDescriptor[] = new Array(partCount);
   scanTemplateContent(template.content, descriptors);
-  return {
-    template,
-    descriptors,
-    clone: () => template.content.cloneNode(true) as DocumentFragment
-  };
+  return { template, descriptors };
 }
 
-function buildHTML(strings: TemplateStringsArray): string {
-  let result = '';
+function createHtmlTemplate(strings: readonly string[]): HTMLTemplateElement {
+  const template = document.createElement('template');
+  
+  let html = '';
   const context = new HTMLContextTracker();
   for (let i = 0; i < strings.length - 1; i++) {
     const chunk = strings[i];
     context.advance(chunk);
-    result += chunk;
+    html += chunk;
     if (context.inAttributeValue()) {
       const mode = context.getMode();
       const marker = createAttributeMarker(i);
-      result += needsQuotes(mode) ? `"${marker}"` : marker;
+      html += needsQuotes(mode) ? `"${marker}"` : marker;
     } else {
-      result += createNodeMarker(i);
+      html += createNodeMarker(i);
     }
   }
-  result += strings[strings.length - 1];
-  return result;
+  html += strings[strings.length - 1];
+  
+  template.innerHTML = html;
+  return template;
 }
 
 function createNodeMarker(index: number): string {
