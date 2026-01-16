@@ -4,7 +4,7 @@ This document explains how the framework turns `html` tagged templates into live
 
 ## 1. High-Level Flow
 
-```
+```text
 (template literal) --> html() --> TemplateResult
                           |
                           v
@@ -54,7 +54,7 @@ When the framework sees a new `strings` array it:
 
 ### Marker Anatomy
 
-```
+```text
 Node Part Marker       : <!--part:INDEX-->
 Attribute Part Marker  : "%%PART:INDEX%%"
 ```
@@ -83,7 +83,6 @@ sequenceDiagram
     HTML-->>App: return TemplateResult
 ```
 
-
 ## 4. Instantiation (`instantiate`)
 
 `instantiate(result, runtime)` wires a `TemplateResult` to a `PartRuntime`:
@@ -96,7 +95,7 @@ sequenceDiagram
    - All other values are written once.
 5. Returns `{ fragment, parts, dispose }`, where `dispose` tears down every effect the runtime created.
 
-#### Visualizing Instantiation
+### Visualizing Instantiation
 
 ```mermaid
 flowchart TD
@@ -116,7 +115,6 @@ flowchart TD
     K -- Value is Static --> M[Set Initial Value]
     L -->N[Signal Update] --> O[part.setValue()]
 ```
-
 
 ## 5. Part Types
 
@@ -156,7 +154,7 @@ interface PartRuntime {
 
 ### Reactive Lifecycles
 
-```
+```text
 value is a function --> runtime.effect(() => part.setValue(value()))
 value is static     --> part.setValue(value)
 ```
@@ -234,7 +232,7 @@ html`
    - Mounts the fragment into the component’s shadow DOM.
    - Stores the disposer for `disconnectedCallback()`.
 
-```
+```text
 connectedCallback
     |
     v
