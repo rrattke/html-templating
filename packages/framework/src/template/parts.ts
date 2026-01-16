@@ -1,23 +1,7 @@
-import type { TemplateBinding } from './instantiate.js';
 import type { PartDescriptor } from './html.js';
 import type { PartRuntime } from './runtime.js';
-
-export class PartsTemplate {
-  constructor(
-    public readonly template: HTMLTemplateElement,
-    public readonly descriptors: PartDescriptor[]
-  ) {}
-
-  cloneFragment(): DocumentFragment {
-    return this.template.content.cloneNode(true) as DocumentFragment;
-  }
-
-  createInstance(values: unknown[], runtime: PartRuntime): { fragment: DocumentFragment; dispose: () => void } {
-    // Implementation will be provided by instantiate.ts to avoid circular dependencies
-    // This method signature is defined here but actual implementation is in instantiate.ts
-    throw new Error('createInstance must be implemented - this should be patched by instantiate module');
-  }
-}
+import { TemplateBinding } from './binding.js';
+export { PartsTemplate } from './compiled-template.js';
 
 interface KeyedChild {
   start: Comment;
@@ -109,7 +93,7 @@ export class NodePart {
     }
     if (isIterable(value)) {
       const entries = Array.from(value);
-      if (entries.every(e => isTemplateBinding(e) && e.key !== undefined)) {
+      if (entries.every(e => e instanceof TemplateBinding && e.key !== undefined)) {
         this.#commitKeyed(entries as TemplateBinding[]);
       } else {
         this.#clearKeyedState();
@@ -120,7 +104,7 @@ export class NodePart {
     }
     this.#clearKeyedState();
     this.#disposeChildren();
-    if (isTemplateBinding(value)) {
+    if (value instanceof TemplateBinding) {
       this.#commitTemplate(value);
       return;
     }
@@ -186,7 +170,7 @@ export class NodePart {
     if (value == null || value === false) {
       return;
     }
-    if (isTemplateBinding(value)) {
+    if (value instanceof TemplateBinding) {
       const instance = value.instance();
       this.#childDisposers.push(instance.dispose);
       target.appendChild(instance.fragment);
@@ -427,11 +411,4 @@ function isIterable(value: unknown): value is Iterable<unknown> {
     return false;
   }
   return value != null && typeof (value as Iterable<unknown>)[Symbol.iterator] === 'function';
-}
-
-function isTemplateBinding(value: unknown): value is TemplateBinding {
-  if (value == null || typeof value !== 'object') {
-    return false;
-  }
-  return 'strings' in (value as Record<string, unknown>) && 'values' in (value as Record<string, unknown>);
 }

@@ -1,53 +1,22 @@
 import type { NodePartDescriptor, AttributePartDescriptor, TextContentPartDescriptor, TextTemplatePartDescriptor } from './html.js';
 import { createTemplateDescriptor, resolvePath } from './html.js';
-import { PartsTemplate, StandardAttributePart, PropertyAttributePart, EventAttributePart, TemplateAttributePart, NodePart, TextContentPart, TextTemplate, ATTRIBUTE_BINDING, PROPERTY_BINDING } from './parts.js';
+import { PartsTemplate } from './compiled-template.js';
+import { StandardAttributePart, PropertyAttributePart, EventAttributePart, TemplateAttributePart, NodePart, TextContentPart, TextTemplate, ATTRIBUTE_BINDING, PROPERTY_BINDING } from './parts.js';
 import type { PartRuntime } from './runtime.js';
+import { TemplateBinding } from './binding.js';
 
 const templateCache = new WeakMap<TemplateStringsArray, PartsTemplate>();
 
-export class TemplateBinding {
-  #strings: TemplateStringsArray;
-  #values: unknown[];
-  #runtime: PartRuntime;
-  key?: unknown;
+// Patch TemplateBinding prototype with concrete implementations
+TemplateBinding.prototype.instance = function(this: TemplateBinding) {
+  return create(this.runtime, this.getTemplate(), this.values);
+};
 
-  constructor(strings: TemplateStringsArray, values: unknown[], runtime: PartRuntime) {
-    this.#strings = strings;
-    this.#values = values;
-    this.#runtime = runtime;
-  }
+TemplateBinding.prototype.getTemplate = function(this: TemplateBinding): PartsTemplate {
+  return getPartsTemplate(this.strings);
+};
 
-  static with(runtime: PartRuntime): (strings: TemplateStringsArray, ...values: unknown[]) => TemplateBinding {
-    return (strings: TemplateStringsArray, ...values: unknown[]) => {
-      return new TemplateBinding(strings, values, runtime);
-    };
-  }
-
-  get strings(): TemplateStringsArray {
-    return this.#strings;
-  }
-
-  get values(): unknown[] {
-    return this.#values;
-  }
-
-  get runtime(): PartRuntime {
-    return this.#runtime;
-  }
-
-  setKey(keyValue: unknown): this {
-    this.key = keyValue;
-    return this;
-  }
-
-  instance() {
-    return create(this.#runtime, this.getTemplate(), this.#values);
-  }
-
-  getTemplate(): PartsTemplate {
-    return getPartsTemplate(this.#strings);
-  }
-}
+export { TemplateBinding };
 
 export function getPartsTemplate(strings: TemplateStringsArray): PartsTemplate {
   let template = templateCache.get(strings);
