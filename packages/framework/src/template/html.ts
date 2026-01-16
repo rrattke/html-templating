@@ -89,7 +89,9 @@ function buildHTML(strings: TemplateStringsArray): string {
     context.advance(chunk);
     result += chunk;
     if (context.inAttributeValue()) {
-      result += createAttributeMarker(i, context.getMode());
+      const mode = context.getMode();
+      const marker = createAttributeMarker(i);
+      result += needsQuotes(mode) ? `"${marker}"` : marker;
     } else {
       result += createNodeMarker(i);
     }
@@ -102,13 +104,13 @@ function createNodeMarker(index: number): string {
   return `<!--${NODE_MARKER_PREFIX}${index}-->`;
 }
 
-function createAttributeMarker(index: number, mode: ParserMode): string {
-  // If already inside a quoted attribute, don't add quotes
-  if (mode === 'ATTR_VALUE_DOUBLE' || mode === 'ATTR_VALUE_SINGLE') {
-    return `${ATTR_MARKER_PREFIX}${index}${ATTR_MARKER_SUFFIX}`;
-  }
-  // For unquoted or pending (at the = sign), add quotes
-  return `"${ATTR_MARKER_PREFIX}${index}${ATTR_MARKER_SUFFIX}"`;
+function createAttributeMarker(index: number): string {
+  return `${ATTR_MARKER_PREFIX}${index}${ATTR_MARKER_SUFFIX}`;
+}
+
+function needsQuotes(mode: ParserMode): boolean {
+  // Unquoted attributes need quotes added around the marker
+  return mode !== 'ATTR_VALUE_DOUBLE' && mode !== 'ATTR_VALUE_SINGLE';
 }
 
 type ParserMode =
@@ -367,13 +369,6 @@ function extractAttributeParts(element: Element, root: DocumentFragment, descrip
       descriptors[idx] = descriptor;
     }
   }
-}
-
-function parseAttributeMarker(text: string): number {
-  const start = text.indexOf(ATTR_MARKER_PREFIX);
-  const end = text.indexOf(ATTR_MARKER_SUFFIX, start + ATTR_MARKER_PREFIX.length);
-  const numeric = text.slice(start + ATTR_MARKER_PREFIX.length, end);
-  return Number.parseInt(numeric, 10);
 }
 
 function buildPath(node: Node, root: DocumentFragment): number[] {

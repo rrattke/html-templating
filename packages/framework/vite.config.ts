@@ -29,7 +29,8 @@ export default defineConfig({
     dts({
       tsconfigPath: path.resolve(dirname, 'tsconfig.json'),
       outDir: 'lib',
-      insertTypesEntry: true
+      insertTypesEntry: true,
+      exclude: ['**/*.spec.ts', '**/*.test.ts']
     })
   ]
 });

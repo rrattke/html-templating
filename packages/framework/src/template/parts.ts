@@ -8,6 +8,44 @@ interface KeyedChild {
   dispose: () => void;
 }
 
+/**
+ * Strategy interface for setting attribute or property values on elements.
+ */
+interface BindingStrategy {
+  set(element: Element, name: string, value: unknown): void;
+}
+
+/**
+ * Binding strategy that sets HTML attributes using setAttribute/removeAttribute.
+ * Handles boolean values: null/false removes attribute, true sets empty string.
+ */
+class AttributeBinding implements BindingStrategy {
+  set(element: Element, name: string, value: unknown): void {
+    if (value == null || value === false) {
+      element.removeAttribute(name);
+      return;
+    }
+    if (value === true) {
+      element.setAttribute(name, '');
+      return;
+    }
+    element.setAttribute(name, String(value));
+  }
+}
+
+/**
+ * Binding strategy that sets element properties directly.
+ */
+class PropertyBinding implements BindingStrategy {
+  set(element: Element, name: string, value: unknown): void {
+    (element as unknown as Record<string, unknown>)[name] = value;
+  }
+}
+
+// Module-wide singleton instances (exported for use in instantiate.ts)
+export const ATTRIBUTE_BINDING = new AttributeBinding();
+export const PROPERTY_BINDING = new PropertyBinding();
+
 export class TextTemplate {
   #strings: string[];
   #values: unknown[];
@@ -242,77 +280,97 @@ export class NodePart {
   }
 }
 
-export class AttributePart {
-  #listener: EventListener | null = null;
-  #isPropertyBinding: boolean;
-  #isEvent: boolean;
+/**
+ * Attribute part for standard HTML attributes.
+ * Handles boolean values: null/false removes attribute, true sets empty string.
+ */
+export class StandardAttributePart {
   #element: Element;
   #name: string;
-  #textTemplate: TextTemplate | null = null;
-  #slotIndex: number = 0;
+  #strategy: BindingStrategy;
 
-  constructor(element: Element, name: string, textTemplate?: TextTemplate, slotIndex?: number) {
+  constructor(element: Element, name: string) {
     this.#element = element;
     this.#name = name;
-    this.#isPropertyBinding = this.#name.startsWith('.');
-    this.#isEvent = this.#name.startsWith('on');
-    this.#textTemplate = textTemplate ?? null;
-    this.#slotIndex = slotIndex ?? 0;
-  }
-
-  get isEvent(): boolean {
-    return this.#isEvent;
+    this.#strategy = ATTRIBUTE_BINDING;
   }
 
   setValue(value: unknown): void {
-    if (this.#textTemplate) {
-      this.#textTemplate.setSlot(this.#slotIndex, value);
-      this.#applyTextTemplate();
-      return;
-    }
-    if (this.#isEvent) {
-      this.#commitEvent(value);
-      return;
-    }
-    if (this.#isPropertyBinding) {
-      const property = this.#name.slice(1);
-      (this.#element as unknown as Record<string, unknown>)[property] = value;
-      return;
-    }
-    if (value == null || value === false) {
-      this.#element.removeAttribute(this.#name);
-      return;
-    }
-    if (value === true) {
-      this.#element.setAttribute(this.#name, '');
-      return;
-    }
-    this.#element.setAttribute(this.#name, String(value));
+    this.#strategy.set(this.#element, this.#name, value);
+  }
+}
+
+/**
+ * Attribute part for property bindings.
+ * Sets element properties directly instead of using setAttribute.
+ * Expects the property name without the '.' prefix (e.g., 'value' not '.value').
+ */
+export class PropertyAttributePart {
+  #element: Element;
+  #property: string;
+  #strategy: BindingStrategy;
+
+  constructor(element: Element, propertyName: string) {
+    this.#element = element;
+    this.#property = propertyName;
+    this.#strategy = PROPERTY_BINDING;
   }
 
-  #applyTextTemplate(): void {
-    if (!this.#textTemplate) {
-      return;
-    }
-    const rendered = this.#textTemplate.render();
-    if (this.#isPropertyBinding) {
-      const property = this.#name.slice(1);
-      (this.#element as unknown as Record<string, unknown>)[property] = rendered;
-      return;
-    }
-    this.#element.setAttribute(this.#name, rendered);
+  setValue(value: unknown): void {
+    this.#strategy.set(this.#element, this.#property, value);
+  }
+}
+
+/**
+ * Attribute part for event listeners.
+ * Manages addEventListener/removeEventListener lifecycle.
+ * Expects the event name without the 'on' prefix (e.g., 'click' not 'onclick').
+ */
+export class EventAttributePart {
+  #element: Element;
+  #eventName: string;
+  #listener: EventListener | null = null;
+
+  constructor(element: Element, eventName: string) {
+    this.#element = element;
+    this.#eventName = eventName;
   }
 
-  #commitEvent(value: unknown): void {
-    const eventName = this.#name.slice(2);
+  setValue(value: unknown): void {
     if (this.#listener) {
-      this.#element.removeEventListener(eventName, this.#listener);
+      this.#element.removeEventListener(this.#eventName, this.#listener);
       this.#listener = null;
     }
     if (typeof value === 'function') {
       this.#listener = value as EventListener;
-      this.#element.addEventListener(eventName, this.#listener);
+      this.#element.addEventListener(this.#eventName, this.#listener);
     }
+  }
+}
+
+/**
+ * Attribute part for interpolated attributes with text templates.
+ * Renders the template then applies via the provided binding strategy.
+ */
+export class TemplateAttributePart {
+  #element: Element;
+  #name: string;
+  #textTemplate: TextTemplate;
+  #slotIndex: number;
+  #strategy: BindingStrategy;
+
+  constructor(element: Element, name: string, textTemplate: TextTemplate, slotIndex: number, strategy: BindingStrategy) {
+    this.#element = element;
+    this.#name = name;
+    this.#textTemplate = textTemplate;
+    this.#slotIndex = slotIndex;
+    this.#strategy = strategy;
+  }
+
+  setValue(value: unknown): void {
+    this.#textTemplate.setSlot(this.#slotIndex, value);
+    const rendered = this.#textTemplate.render();
+    this.#strategy.set(this.#element, this.#name, rendered);
   }
 }
 
