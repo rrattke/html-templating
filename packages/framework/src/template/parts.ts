@@ -26,6 +26,135 @@ interface KeyedChild {
 }
 
 /**
+ * Manages keyed template instances for efficient DOM updates.
+ * Handles creation, reordering, and disposal of keyed children.
+ */
+class KeyedChildrenManager {
+  #anchor: Comment;
+  #keyedChildren: Map<unknown, KeyedChild> = new Map();
+  #disposers: Array<() => void> = [];
+
+  constructor(anchor: Comment) {
+    this.#anchor = anchor;
+  }
+
+  /**
+   * Updates the DOM to match the provided keyed binding(s).
+   * Accepts either a single keyed template or an array of keyed templates.
+   * Reuses existing instances with matching keys, creates new ones, and removes old ones.
+   */
+  update(value: TemplateBinding | TemplateBinding[]): void {
+    const entries = Array.isArray(value) ? value : [value];
+    const parent = this.#anchor.parentNode;
+    if (!parent) {
+      return;
+    }
+
+    const seen = new Set<unknown>();
+    let anchor: ChildNode | null = this.#anchor;
+
+    // Process entries in reverse order to maintain correct DOM order
+    for (let i = entries.length - 1; i >= 0; i--) {
+      const entry = entries[i];
+      const key = entry.key!;
+      const existing = this.#keyedChildren.get(key);
+
+      if (existing) {
+        // Reuse existing child, move to correct position
+        this.#moveKeyedChild(existing, anchor);
+        anchor = existing.start;
+      } else {
+        // Create new child
+        const child = this.#createKeyedChild(entry, anchor);
+        this.#keyedChildren.set(key, child);
+        this.#disposers.push(child.dispose);
+        anchor = child.start;
+      }
+      seen.add(key);
+    }
+
+    // Remove children that are no longer present
+    for (const [key, child] of Array.from(this.#keyedChildren.entries())) {
+      if (!seen.has(key)) {
+        const disposeIndex = this.#disposers.indexOf(child.dispose);
+        if (disposeIndex !== -1) {
+          this.#disposers.splice(disposeIndex, 1);
+        }
+        this.#removeKeyedChild(child);
+        this.#keyedChildren.delete(key);
+      }
+    }
+  }
+
+  /**
+   * Clears all keyed children and resets state.
+   */
+  clear(): void {
+    for (const child of this.#keyedChildren.values()) {
+      this.#removeKeyedChild(child);
+    }
+    this.#keyedChildren.clear();
+    this.#disposers = [];
+  }
+
+  /**
+   * Returns the disposer functions for all keyed children.
+   */
+  getDisposers(): Array<() => void> {
+    return this.#disposers;
+  }
+
+  /**
+   * Returns true if this manager has any keyed children.
+   */
+  hasChildren(): boolean {
+    return this.#keyedChildren.size > 0;
+  }
+
+  #createKeyedChild(binding: TemplateBinding, anchor: ChildNode | null): KeyedChild {
+    const { fragment, dispose } = binding.instance();
+    const doc = this.#anchor.ownerDocument;
+    const start = doc.createComment('key-start');
+    const end = doc.createComment('key-end');
+    const wrapper = doc.createDocumentFragment();
+    wrapper.append(start);
+    wrapper.append(fragment);
+    wrapper.append(end);
+    this.#anchor.parentNode?.insertBefore(wrapper, anchor);
+    return { start, end, dispose };
+  }
+
+  #moveKeyedChild(child: KeyedChild, anchor: ChildNode | null): void {
+    const parent = this.#anchor.parentNode;
+    if (!parent) {
+      return;
+    }
+    let node: ChildNode | null = child.start;
+    while (node) {
+      const next: ChildNode | null = node.nextSibling;
+      parent.insertBefore(node, anchor);
+      if (node === child.end) {
+        break;
+      }
+      node = next;
+    }
+  }
+
+  #removeKeyedChild(child: KeyedChild): void {
+    child.dispose();
+    let node: ChildNode | null = child.start;
+    while (node) {
+      const next: ChildNode | null = node.nextSibling;
+      node.remove();
+      if (node === child.end) {
+        break;
+      }
+      node = next;
+    }
+  }
+}
+
+/**
  * Strategy interface for setting attribute or property values on elements.
  */
 interface BindingStrategy {
@@ -91,7 +220,7 @@ export class NodePart {
   #end: Comment;
   #current: Node | null = null;
   #childDisposers: Array<() => void> = [];
-  #keyedChildren: Map<unknown, KeyedChild> | null = null;
+  #keyedManager: KeyedChildrenManager | null = null;
 
   constructor(markerNode: Comment) {
     const doc = markerNode.ownerDocument;
@@ -120,7 +249,7 @@ export class NodePart {
     }
     if (isTemplateBinding(value)) {
       if (value.key !== undefined) {
-        this.#commitKeyed([value]);
+        this.#commitKeyed(value);
       } else {
         this.#clearKeyedState();
         this.#disposeChildren();
@@ -151,43 +280,20 @@ export class NodePart {
     this.#commitNode(fragment);
   }
 
-  #commitKeyed(entries: TemplateBinding[]): void {
+  #commitKeyed(value: TemplateBinding | TemplateBinding[]): void {
     const parent = this.#end.parentNode;
     if (!parent) {
       return;
     }
-    if (!this.#keyedChildren) {
+    if (!this.#keyedManager) {
       // Transitioning from non-keyed to keyed - clear non-keyed content
       this.#disposeChildren();
       this.#clearRange();
-      this.#keyedChildren = new Map();
+      this.#keyedManager = new KeyedChildrenManager(this.#end);
     }
-    const seen = new Set<unknown>();
-    let anchor: ChildNode | null = this.#end;
-    for (let i = entries.length - 1; i >= 0; i--) {
-      const entry = entries[i];
-      const existing = this.#keyedChildren.get(entry.key!);
-      if (existing) {
-        this.#moveKeyedChild(existing, anchor);
-        anchor = existing.start;
-      } else {
-        const child = this.#createKeyedChild(entry, anchor);
-        this.#keyedChildren.set(entry.key!, child);
-        this.#childDisposers.push(child.dispose);
-        anchor = child.start;
-      }
-      seen.add(entry.key!);
-    }
-    for (const [key, child] of Array.from(this.#keyedChildren.entries())) {
-      if (!seen.has(key)) {
-        const disposeIndex = this.#childDisposers.indexOf(child.dispose);
-        if (disposeIndex !== -1) {
-          this.#childDisposers.splice(disposeIndex, 1);
-        }
-        this.#removeKeyedChild(child);
-        this.#keyedChildren.delete(key);
-      }
-    }
+    
+    this.#keyedManager.update(value);
+    this.#childDisposers = this.#keyedManager.getDisposers();
     this.#current = null;
   }
 
@@ -222,13 +328,11 @@ export class NodePart {
   }
 
   #clearKeyedState(): void {
-    if (!this.#keyedChildren) {
+    if (!this.#keyedManager) {
       return;
     }
-    for (const child of this.#keyedChildren.values()) {
-      this.#removeKeyedChild(child);
-    }
-    this.#keyedChildren = null;
+    this.#keyedManager.clear();
+    this.#keyedManager = null;
     this.#childDisposers = [];
     this.#current = null;
   }
@@ -265,48 +369,6 @@ export class NodePart {
       pointer = next;
     }
     this.#current = null;
-  }
-
-  #createKeyedChild(binding: TemplateBinding, anchor: ChildNode | null): KeyedChild {
-    const { fragment, dispose } = binding.instance();
-    const doc = this.#end.ownerDocument;
-    const start = doc.createComment('key-start');
-    const end = doc.createComment('key-end');
-    const wrapper = doc.createDocumentFragment();
-    wrapper.append(start);
-    wrapper.append(fragment);
-    wrapper.append(end);
-    this.#end.parentNode?.insertBefore(wrapper, anchor);
-    return { start, end, dispose };
-  }
-
-  #moveKeyedChild(child: KeyedChild, anchor: ChildNode | null): void {
-    const parent = this.#end.parentNode;
-    if (!parent) {
-      return;
-    }
-    let node: ChildNode | null = child.start;
-    while (node) {
-      const next: ChildNode | null = node.nextSibling;
-      parent.insertBefore(node, anchor);
-      if (node === child.end) {
-        break;
-      }
-      node = next;
-    }
-  }
-
-  #removeKeyedChild(child: KeyedChild): void {
-    child.dispose();
-    let node: ChildNode | null = child.start;
-    while (node) {
-      const next: ChildNode | null = node.nextSibling;
-      node.remove();
-      if (node === child.end) {
-        break;
-      }
-      node = next;
-    }
   }
 }
 

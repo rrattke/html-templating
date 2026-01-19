@@ -104,6 +104,7 @@ export function create(runtime: PartRuntime, template: PartsTemplate, values: un
     const value = values[index];
     if (typeof value === 'function') {
       if (part instanceof EventAttributePart) {
+        part.setValue(value);
         disposers.push(() => part.dispose());
       }
       else {
