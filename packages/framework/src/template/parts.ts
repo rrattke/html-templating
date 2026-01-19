@@ -118,12 +118,18 @@ export class NodePart {
       }
       return;
     }
-    this.#clearKeyedState();
-    this.#disposeChildren();
     if (isTemplateBinding(value)) {
-      this.#commitTemplate(value);
+      if (value.key !== undefined) {
+        this.#commitKeyed([value]);
+      } else {
+        this.#clearKeyedState();
+        this.#disposeChildren();
+        this.#commitTemplate(value);
+      }
       return;
     }
+    this.#clearKeyedState();
+    this.#disposeChildren();
     if (value instanceof Node) {
       this.#commitNode(value);
       return;
@@ -151,6 +157,9 @@ export class NodePart {
       return;
     }
     if (!this.#keyedChildren) {
+      // Transitioning from non-keyed to keyed - clear non-keyed content
+      this.#disposeChildren();
+      this.#clearRange();
       this.#keyedChildren = new Map();
     }
     const seen = new Set<unknown>();
@@ -220,6 +229,7 @@ export class NodePart {
       this.#removeKeyedChild(child);
     }
     this.#keyedChildren = null;
+    this.#childDisposers = [];
     this.#current = null;
   }
 
