@@ -160,4 +160,33 @@ describe('integration tests', () => {
       expect(div?.getAttribute('data-values')).toBe('42 true');
     });
   });
+
+  describe('keyed templates with html(key) syntax', () => {
+    it('should create keyed template using html(key) syntax', () => {
+      const template = html('my-key')`<div>Content</div>`;
+      
+      expect(template.key).toBe('my-key');
+      
+      const instance = template.instance();
+      container.appendChild(instance.fragment);
+      
+      const div = container.querySelector('div');
+      expect(div?.textContent).toBe('Content');
+    });
+
+    it('should create keyed templates in arrays', () => {
+      const items = ['a', 'b', 'c'];
+      const templates = items.map(item => html(item)`<span>${item}</span>`);
+      
+      expect(templates[0].key).toBe('a');
+      expect(templates[1].key).toBe('b');
+      expect(templates[2].key).toBe('c');
+    });
+
+    it('should work with numeric keys', () => {
+      const template = html(123)`<div>Numbered</div>`;
+      
+      expect(template.key).toBe(123);
+    });
+  });
 });

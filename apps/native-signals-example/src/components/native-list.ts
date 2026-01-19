@@ -98,12 +98,12 @@ export class NativeList extends ReactiveElement {
         <button type="button" onclick=${() => this.#addItem()}>Add Item</button>
       </div>
       <ul>
-        ${() => this.items.map(label => html`
+        ${() => this.items.map(label => html(label)`
           <li>
             <span>${label}</span>
             <button type="button" onclick=${() => this.#removeItem(label)}>Remove</button>
           </li>
-        `.setKey(label))}
+        `)}
       </ul>
     `;
   }

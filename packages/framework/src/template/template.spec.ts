@@ -260,10 +260,22 @@ describe('html template function', () => {
       expect(template.values).toEqual(['test']);
     });
 
-    it('should support setting keys', () => {
+    it('should support setting keys with setKey method (legacy)', () => {
       const template = html`<div>test</div>`.setKey('unique-key');
       
       expect(template.key).toBe('unique-key');
+    });
+
+    it('should support setting keys with html(key) syntax', () => {
+      const template = html('unique-key')`<div>test</div>`;
+      
+      expect(template.key).toBe('unique-key');
+    });
+
+    it('should support html() with no key', () => {
+      const template = html()`<div>test</div>`;
+      
+      expect(template.key).toBeUndefined();
     });
 
     it('should chain setKey method', () => {

@@ -17,10 +17,28 @@ export class TemplateBinding {
     this.#runtime = runtime;
   }
 
-  static with(runtime: PartRuntime): (strings: TemplateStringsArray, ...values: unknown[]) => TemplateBinding {
-    return (strings: TemplateStringsArray, ...values: unknown[]) => {
+  static with(runtime: PartRuntime): ((strings: TemplateStringsArray, ...values: unknown[]) => TemplateBinding) & ((key?: unknown) => (strings: TemplateStringsArray, ...values: unknown[]) => TemplateBinding) {
+    const createBinding = (strings: TemplateStringsArray, ...values: unknown[]): TemplateBinding => {
       return new TemplateBinding(strings, values, runtime);
     };
+
+    const htmlFunction = ((stringsOrKey?: TemplateStringsArray | unknown, ...values: unknown[]) => {
+      // If called as a template tag: html``
+      if (stringsOrKey && typeof stringsOrKey === 'object' && 'raw' in stringsOrKey) {
+        return new TemplateBinding(stringsOrKey as TemplateStringsArray, values, runtime);
+      }
+      // If called as a function: html(key)
+      const key = stringsOrKey;
+      return (strings: TemplateStringsArray, ...values: unknown[]) => {
+        const binding = new TemplateBinding(strings, values, runtime);
+        if (key !== undefined) {
+          binding.key = key;
+        }
+        return binding;
+      };
+    }) as ((strings: TemplateStringsArray, ...values: unknown[]) => TemplateBinding) & ((key?: unknown) => (strings: TemplateStringsArray, ...values: unknown[]) => TemplateBinding);
+
+    return htmlFunction;
   }
 
   get strings(): TemplateStringsArray {
