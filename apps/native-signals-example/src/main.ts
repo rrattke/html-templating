@@ -1,5 +1,5 @@
 import { setRuntime } from '@vanishing/framework/runtime';
-import { nativeRuntime } from './runtime/native-runtime.js';
+import { nativeRuntime } from '@vanishing/framework/reactive';
 
 // Configure the global runtime
 setRuntime(nativeRuntime);

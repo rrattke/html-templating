@@ -9,7 +9,6 @@ export interface SignalsRuntime {
   onCleanup(fn: () => void): void;
 }
 
-
 declare global {
   var __SIGNALS_RUNTIME__: SignalsRuntime | undefined;
 }
