@@ -25,14 +25,12 @@ interface KeyedChild {
 }
 
 /**
- * Manages keyed template instances for efficient DOM updates.
- * Handles creation, reordering, and disposal of keyed children.
+ * Manages list rendering for both keyed and non-keyed content.
+ * Handles creation, reordering, and disposal of list items.
  * 
- * IMPORTANT: Keys must be unique and stable. When the same key appears in multiple
- * updates, the existing DOM instance is reused and moved, not recreated. This means:
- * - Keys should uniquely identify each item across all updates
- * - Reusing a key will reuse the existing DOM element (no new instance created)
- * - Key collisions will cause unexpected behavior (items appearing in wrong positions)
+ * KEYED ITEMS: Template bindings with keys are tracked and reused across updates.
+ * When the same key appears in multiple updates, the existing DOM instance is reused
+ * and moved, not recreated. Keys must be unique and stable.
  * 
  * Good key strategies:
  * - Unique IDs (UUIDs, database IDs, incrementing counters)
@@ -42,117 +40,209 @@ interface KeyedChild {
  * - Array indices (changes when items are reordered/removed)
  * - Derived values that can collide (item.length + 1, current timestamp)
  * - Display labels (unless guaranteed to be unique and stable)
+ * 
+ * NON-KEYED ITEMS: All other content (non-keyed templates, nodes, primitives) is
+ * disposed and recreated on every update. No reuse occurs for non-keyed items.
  */
 class ListManager {
   #range: NodeRange;
-  #items: Map<unknown, KeyedChild> = new Map();
-  #disposers: Array<() => void> = [];
+  #keyedItems: Map<unknown, KeyedChild> = new Map();
+  #nonKeyedDisposers: Array<() => void> = [];
 
   constructor(range: NodeRange) {
     this.#range = range;
   }
 
   /**
-   * Updates the DOM to match the provided keyed binding(s).
-   * Accepts either a single keyed template or an array of keyed templates.
-   * Reuses existing instances with matching keys, creates new ones, and removes old ones.
+   * Updates the DOM to match the provided list of items.
+   * - Keyed template bindings: reused when key matches (last occurrence wins for duplicate keys)
+   * - Non-keyed items: disposed and recreated every update
    */
-  update(value: TemplateBinding | TemplateBinding[]): void {
-    const entries = Array.isArray(value) ? value : [value];
+  update(entries: unknown[]): void {
     const parent = this.#range.start.parentNode;
     if (!parent) {
       return;
     }
+
+    // Dispose all non-keyed items from previous update
+    this.#disposeNonKeyed();
 
     const seen = new Set<unknown>();
-    let anchor: ChildNode | null = this.#range.start;
+    const fragment = this.#range.ownerDocument.createDocumentFragment();
 
-    // Process entries in reverse order to maintain correct DOM order
-    for (let i = entries.length - 1; i >= 0; i--) {
-      const entry = entries[i];
-      const key = entry.key!;
-      const existing = this.#items.get(key);
-
-      if (existing) {
-        // Reuse existing child, move to correct position
-        this.#moveItem(existing, anchor);
-        anchor = existing.range.start;
-      } else {
-        // Create new child
-        const child = this.#createItem(entry, anchor);
-        this.#items.set(key, child);
-        this.#disposers.push(child.dispose);
-        anchor = child.range.start;
-      }
-      seen.add(key);
-    }
-
-    // Remove children that are no longer present
-    for (const [key, child] of Array.from(this.#items.entries())) {
-      if (!seen.has(key)) {
-        const disposeIndex = this.#disposers.indexOf(child.dispose);
-        if (disposeIndex !== -1) {
-          this.#disposers.splice(disposeIndex, 1);
+    // Process all entries and build fragment
+    for (const entry of entries) {
+      // Check if this is a keyed template binding
+      if (isTemplateBinding(entry) && entry.key !== undefined) {
+        const key = entry.key;
+        
+        // For duplicate keys in the same update, last occurrence wins
+        // So if we've already seen this key in THIS update, dispose the previous one
+        if (seen.has(key)) {
+          const existing = this.#keyedItems.get(key);
+          if (existing) {
+            existing.dispose();
+            this.#keyedItems.delete(key);
+          }
         }
-        this.#removeItem(child);
-        this.#items.delete(key);
+        
+        const existing = this.#keyedItems.get(key);
+
+        if (existing) {
+          this.#reuseKeyedItem(existing, fragment);
+          seen.add(key);
+        } else {
+          this.#createKeyedItem(key, entry, fragment);
+          seen.add(key);
+        }
+      } else {
+        this.#processNonKeyedItem(entry, fragment);
       }
     }
+
+    // Remove keyed children that are no longer present
+    for (const [key, child] of Array.from(this.#keyedItems.entries())) {
+      if (!seen.has(key)) {
+        child.dispose();
+        this.#keyedItems.delete(key);
+      }
+    }
+
+    // Replace entire range contents with new fragment
+    this.#range.deleteContents();
+    this.#range.insertNode(fragment);
   }
 
   /**
-   * Clears all keyed children and resets state.
+   * Clears all keyed and non-keyed children and resets state.
    */
   clear(): void {
-    for (const child of this.#items.values()) {
-      this.#removeItem(child);
+    this.#disposeNonKeyed();
+    for (const child of this.#keyedItems.values()) {
+      child.dispose();
     }
-    this.#items.clear();
-    this.#disposers = [];
+    this.#keyedItems.clear();
+    this.#range.deleteContents();
   }
 
   /**
-   * Returns true if this manager has any keyed children.
+   * Returns true if this manager has any children (keyed or non-keyed).
    */
   hasChildren(): boolean {
-    return this.#items.size > 0;
+    return this.#keyedItems.size > 0 || this.#nonKeyedDisposers.length > 0;
   }
 
-  #createItem(binding: TemplateBinding, anchor: ChildNode | null): KeyedChild {
-    const { fragment, dispose } = binding.instance();
+  /**
+   * Disposes all non-keyed items from the previous update.
+   * Called at the start of each update.
+   */
+  #disposeNonKeyed(): void {
+    while (this.#nonKeyedDisposers.length) {
+      const dispose = this.#nonKeyedDisposers.pop();
+      dispose?.();
+    }
+  }
+
+  /**
+   * Reuses an existing keyed item by extracting it from the DOM and appending to the fragment.
+   * Note: We need to move both the marker and the content nodes to maintain the range structure.
+   */
+  #reuseKeyedItem(child: KeyedChild, fragment: DocumentFragment): void {
+    // Get the marker and extract content nodes
+    const marker = child.range.start;
+    const contentFragment = child.range.extractContents();
+    const contentNodes = Array.from(contentFragment.childNodes);
+    
+    // Remove marker from DOM
+    marker.remove();
+    
+    // Add marker to fragment first
+    fragment.appendChild(marker);
+    // Then add content nodes
+    for (const node of contentNodes) {
+      fragment.appendChild(node);
+    }
+    
+    // Update the range's end to point to the last content node (or marker if no content)
+    // This is necessary because after extractContents(), the range was collapsed
+    child.range = new NodeRange(marker, contentNodes.length > 0 ? contentNodes[contentNodes.length - 1] : marker);
+  }
+
+  /**
+   * Creates a new keyed item by instantiating the template and tracking it.
+   */
+  #createKeyedItem(key: unknown, entry: TemplateBinding, fragment: DocumentFragment): void {
+    const { fragment: itemFragment, dispose } = entry.instance();
     const marker = this.#range.ownerDocument.createComment('item');
-    this.#range.start.parentNode?.insertBefore(marker, anchor);
+    fragment.appendChild(marker);
     
-    const range = new NodeRange(marker);
-    range.insertNode(fragment);
-    
-    return { range, dispose };
-  }
-
-  #moveItem(child: KeyedChild, anchor: ChildNode | null): void {
-    const parent = this.#range.start.parentNode;
-    if (!parent) {
-      return;
+    const nodes = Array.from(itemFragment.childNodes);
+    for (const node of nodes) {
+      fragment.appendChild(node);
     }
     
-    // Move all nodes in the range (marker + content)
-    let node: ChildNode | null = child.range.start;
-    const endNode = child.range.end;
-    
-    while (node) {
-      const next: ChildNode | null = node.nextSibling;
-      parent.insertBefore(node, anchor);
-      if (node === endNode) {
-        break;
+    const range = new NodeRange(marker, nodes.length > 0 ? nodes[nodes.length - 1] : marker);
+    this.#keyedItems.set(key, { range, dispose });
+  }
+
+  /**
+   * Processes a non-keyed item by preparing it and adding to the fragment.
+   */
+  #processNonKeyedItem(value: unknown, fragment: DocumentFragment): void {
+    const prepared = this.#prepareItem(value);
+    if (prepared.dispose) {
+      this.#nonKeyedDisposers.push(prepared.dispose);
+    }
+    for (const node of prepared.nodes) {
+      fragment.appendChild(node);
+    }
+  }
+
+  /**
+   * Prepares an item value into a list of nodes ready for insertion.
+   * Handles TemplateBindings, Nodes, nested iterables, and primitives.
+   * Returns array of nodes and optional dispose function.
+   */
+  #prepareItem(value: unknown): { nodes: Node[]; dispose?: () => void } {
+    // Null/false → empty
+    if (value == null || value === false) {
+      return { nodes: [] };
+    }
+
+    // TemplateBinding → instantiate
+    if (isTemplateBinding(value)) {
+      const instance = value.instance();
+      const nodes = Array.from(instance.fragment.childNodes);
+      return { nodes, dispose: instance.dispose };
+    }
+
+    // Nested iterable → flatten recursively
+    if (isIterable(value)) {
+      const allNodes: Node[] = [];
+      const disposers: Array<() => void> = [];
+      
+      for (const nested of value) {
+        const prepared = this.#prepareItem(nested);
+        allNodes.push(...prepared.nodes);
+        if (prepared.dispose) {
+          disposers.push(prepared.dispose);
+        }
       }
-      node = next;
+      
+      // Return composite disposer if any nested items need disposal
+      return {
+        nodes: allNodes,
+        dispose: disposers.length > 0 ? () => disposers.forEach(d => d()) : undefined
+      };
     }
-  }
 
-  #removeItem(child: KeyedChild): void {
-    child.dispose();
-    child.range.deleteContents();
-    child.range.start.remove();
+    // Node → use directly
+    if (value instanceof Node) {
+      return { nodes: [value] };
+    }
+
+    // Primitive → text node
+    return { nodes: [this.#range.ownerDocument.createTextNode(String(value))] };
   }
 }
 
@@ -237,6 +327,57 @@ class NodeRange {
   }
 
   /**
+   * Extracts the range contents into a DocumentFragment, removing nodes from the DOM.
+   * After extraction, the range is collapsed (end === start).
+   * Returns an empty fragment if the range is already empty.
+   */
+  extractContents(): DocumentFragment {
+    const fragment = this.#start.ownerDocument.createDocumentFragment();
+    
+    if (this.collapsed()) {
+      return fragment;
+    }
+
+    let node = this.#start.nextSibling;
+    while (node) {
+      const next = node.nextSibling;
+      const isEnd = node === this.#end;
+      fragment.appendChild(node); // Implicitly removes from DOM
+      if (isEnd) {
+        break;
+      }
+      node = next;
+    }
+    
+    this.#end = this.#start;
+    return fragment;
+  }
+
+  /**
+   * Clones the range contents into a DocumentFragment without removing nodes from the DOM.
+   * The range remains unchanged.
+   * Returns an empty fragment if the range is empty.
+   */
+  cloneContents(): DocumentFragment {
+    const fragment = this.#start.ownerDocument.createDocumentFragment();
+    
+    if (this.collapsed()) {
+      return fragment;
+    }
+
+    let node = this.#start.nextSibling;
+    while (node) {
+      fragment.appendChild(node.cloneNode(true));
+      if (node === this.#end) {
+        break;
+      }
+      node = node.nextSibling;
+    }
+    
+    return fragment;
+  }
+
+  /**
    * Removes all nodes from after the start marker up to and including the end node.
    * After deleting contents, the range is empty (end === start).
    */
@@ -303,7 +444,6 @@ class NodeRange {
 
 export class NodePart {
   #range: NodeRange;
-  #childDisposers: Array<() => void> = [];
   #listManager: ListManager | null = null;
 
   constructor(markerNode: Comment) {
@@ -311,117 +451,48 @@ export class NodePart {
   }
 
   setValue(value: unknown): void {
+    // null/undefined/false → clear (false enables conditional rendering: condition && html`...`)
     if (value == null || value === false) {
-      this.#clearKeyedState();
-      this.#disposeChildren();
-      this.#commitText('');
-      return;
-    }
-    if (isIterable(value)) {
-      const entries = Array.from(value);
-      if (entries.every(e => isTemplateBinding(e) && e.key !== undefined)) {
-        this.#commitKeyed(entries as TemplateBinding[]);
-      } else {
-        this.#clearKeyedState();
-        this.#disposeChildren();
-        this.#commitIterableEntries(entries);
-      }
-      return;
-    }
-    if (isTemplateBinding(value)) {
-      if (value.key !== undefined) {
-        this.#commitKeyed(value);
-      } else {
-        this.#clearKeyedState();
-        this.#disposeChildren();
-        this.#commitTemplate(value);
-      }
-      return;
-    }
-    this.#clearKeyedState();
-    this.#disposeChildren();
-    if (value instanceof Node) {
-      this.#commitNode(value);
-      return;
-    }
-    this.#commitText(String(value));
-  }
-
-  #commitTemplate(binding: TemplateBinding): void {
-    const instance = binding.instance();
-    this.#childDisposers.push(instance.dispose);
-    this.#commitNode(instance.fragment);
-  }
-
-  #commitIterableEntries(values: unknown[]): void {
-    const fragment = this.#range.ownerDocument.createDocumentFragment();
-    for (const value of values) {
-      this.#appendIterableValue(fragment, value);
-    }
-    this.#commitNode(fragment);
-  }
-
-  #commitKeyed(value: TemplateBinding | TemplateBinding[]): void {
-    const parent = this.#range.start.parentNode;
-    if (!parent) {
-      return;
-    }
-    if (!this.#listManager) {
-      // Transitioning from non-keyed to keyed - clear non-keyed content
-      this.#disposeChildren();
+      this.#clearListManager();
       this.#range.deleteContents();
-      this.#listManager = new ListManager(this.#range);
-    }
-    
-    this.#listManager.update(value);
-  }
-
-  #appendIterableValue(target: DocumentFragment, value: unknown): void {
-    if (value == null || value === false) {
-      return;
-    }
-    if (isTemplateBinding(value)) {
-      const instance = value.instance();
-      this.#childDisposers.push(instance.dispose);
-      target.appendChild(instance.fragment);
-      return;
-    }
-    if (isIterable(value)) {
-      for (const nested of value) {
-        this.#appendIterableValue(target, nested);
+    } else if (isIterable(value) || (isTemplateBinding(value) && value.key !== undefined)) {
+      // Delegate to ListManager for:
+      // - Arrays/iterables (may contain keyed or non-keyed items)
+      // - Single keyed template bindings
+      if (!this.#listManager) {
+        this.#range.deleteContents();
+        this.#listManager = new ListManager(this.#range);
       }
-      return;
+      const entries = Array.isArray(value) ? value : [value];
+      this.#listManager.update(entries);
+    } else if (isTemplateBinding(value)) {
+      // Non-keyed single template
+      this.#clearListManager();
+      const instance = value.instance();
+      this.#range.insertNode(instance.fragment);
+      // Note: Non-keyed single template disposal is not tracked
+      // This is acceptable as it will be replaced on next setValue
+    } else if (value instanceof Node) {
+      this.#clearListManager();
+      this.#range.insertNode(value);
+    } else {
+      // Primitive value (string, number, etc.)
+      this.#clearListManager();
+      this.#commitText(String(value));
     }
-    if (value instanceof Node) {
-      target.appendChild(value);
-      return;
-    }
-    target.appendChild(this.#range.ownerDocument.createTextNode(String(value)));
   }
 
-  #disposeChildren(): void {
-    while (this.#childDisposers.length) {
-      const dispose = this.#childDisposers.pop();
-      dispose?.();
-    }
-  }
-
-  #clearKeyedState(): void {
+  #clearListManager(): void {
     if (!this.#listManager) {
       return;
     }
     this.#listManager.clear();
     this.#listManager = null;
-    this.#childDisposers = [];
     this.#range.deleteContents();
   }
 
   #commitText(text: string): void {
     const node = this.#range.ownerDocument.createTextNode(text);
-    this.#range.insertNode(node);
-  }
-
-  #commitNode(node: Node): void {
     this.#range.insertNode(node);
   }
 }
