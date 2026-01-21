@@ -58,9 +58,9 @@ export class Counter extends ReactiveElement {
       <header>Counter</header>
       <p class="value">${() => this.count}</p>
       <div class="actions">
-        <button type="button" onclick=${() => this.count--}>-1</button>
-        <button type="button" onclick=${() => this.count++}>+1</button>
-        <button type="button" onclick=${() => this.count = 0}>Reset</button>
+        <button type="button" @click=${() => this.count--}>-1</button>
+        <button type="button" @click=${() => this.count++}>+1</button>
+        <button type="button" @click=${() => this.count = 0}>Reset</button>
       </div>
     `;
   }

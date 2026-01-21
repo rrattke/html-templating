@@ -143,9 +143,9 @@ function createParts(descriptors: Descriptor[], fragment: DocumentFragment, runt
         throw new Error('Attribute descriptor did not resolve to an element.');
       }
       // Determine which specialized part to create based on attribute name prefix
-      if (descriptor.name.startsWith('on')) {
-        // on* → Event handler
-        const eventName = descriptor.name.slice(2);
+      if (descriptor.name.startsWith('@')) {
+        // @event → Event handler
+        const eventName = descriptor.name.slice(1);
         return new EventAttributePart(element, eventName);
       } else if (descriptor.name.startsWith('.')) {
         // .property → Property binding

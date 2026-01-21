@@ -150,16 +150,16 @@ export class List extends ReactiveElement {
         <span>${() => this.items.length} items</span>
       </header>
       <div class="action-bar">
-        <button type="button" onclick=${() => this.#addItem()}>Add Item</button>
+        <button type="button" @click=${() => this.#addItem()}>Add Item</button>
       </div>
       <ul>
         ${() => this.items.map((item, index) => html(item.id)`
           <li>
             <span>${item.label}</span>
             <div class="controls">
-              <button type="button" class="move" onclick=${() => this.#moveUp(item.id)} ?disabled=${() => this.#isFirst(item.id)}>↑</button>
-              <button type="button" class="move" onclick=${() => this.#moveDown(item.id)} ?disabled=${() => this.#isLast(item.id)}>↓</button>
-              <button type="button" class="remove" onclick=${() => this.#removeItem(item.id)}>Remove</button>
+              <button type="button" class="move" @click=${() => this.#moveUp(item.id)} ?disabled=${() => this.#isFirst(item.id)}>↑</button>
+              <button type="button" class="move" @click=${() => this.#moveDown(item.id)} ?disabled=${() => this.#isLast(item.id)}>↓</button>
+              <button type="button" class="remove" @click=${() => this.#removeItem(item.id)}>Remove</button>
             </div>
           </li>
         `)}

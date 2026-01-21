@@ -580,7 +580,7 @@ export class BooleanAttributePart {
 /**
  * Attribute part for event listeners.
  * Manages addEventListener/removeEventListener lifecycle.
- * Expects the event name without the 'on' prefix (e.g., 'click' not 'onclick').
+ * Expects the event name without the '@' prefix (e.g., 'click' not '@click').
  */
 export class EventAttributePart {
   #element: Element;
