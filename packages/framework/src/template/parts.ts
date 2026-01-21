@@ -300,10 +300,7 @@ export class NodePart {
   #keyedManager: KeyedChildrenManager | null = null;
 
   constructor(markerNode: Comment) {
-    const doc = markerNode.ownerDocument;
-    const marker = doc.createComment('part');
-    markerNode.replaceWith(marker);
-    this.#range = new NodeRange(marker);
+    this.#range = new NodeRange(markerNode);
   }
 
   setValue(value: unknown): void {
