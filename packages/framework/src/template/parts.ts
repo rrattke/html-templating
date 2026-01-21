@@ -29,7 +29,7 @@ interface KeyedChild {
  * Manages keyed template instances for efficient DOM updates.
  * Handles creation, reordering, and disposal of keyed children.
  */
-class KeyedChildrenManager {
+class ListManager {
   #anchor: Comment;
   #keyedChildren: Map<unknown, KeyedChild> = new Map();
   #disposers: Array<() => void> = [];
@@ -95,13 +95,6 @@ class KeyedChildrenManager {
     }
     this.#keyedChildren.clear();
     this.#disposers = [];
-  }
-
-  /**
-   * Returns the disposer functions for all keyed children.
-   */
-  getDisposers(): Array<() => void> {
-    return this.#disposers;
   }
 
   /**
@@ -297,7 +290,7 @@ class NodeRange {
 export class NodePart {
   #range: NodeRange;
   #childDisposers: Array<() => void> = [];
-  #keyedManager: KeyedChildrenManager | null = null;
+  #listManager: ListManager | null = null;
 
   constructor(markerNode: Comment) {
     this.#range = new NodeRange(markerNode);
@@ -359,15 +352,14 @@ export class NodePart {
     if (!parent) {
       return;
     }
-    if (!this.#keyedManager) {
+    if (!this.#listManager) {
       // Transitioning from non-keyed to keyed - clear non-keyed content
       this.#disposeChildren();
       this.#range.deleteContents();
-      this.#keyedManager = new KeyedChildrenManager(this.#range.start);
+      this.#listManager = new ListManager(this.#range.start);
     }
     
-    this.#keyedManager.update(value);
-    this.#childDisposers = this.#keyedManager.getDisposers();
+    this.#listManager.update(value);
   }
 
   #appendIterableValue(target: DocumentFragment, value: unknown): void {
@@ -401,11 +393,11 @@ export class NodePart {
   }
 
   #clearKeyedState(): void {
-    if (!this.#keyedManager) {
+    if (!this.#listManager) {
       return;
     }
-    this.#keyedManager.clear();
-    this.#keyedManager = null;
+    this.#listManager.clear();
+    this.#listManager = null;
     this.#childDisposers = [];
     this.#range.deleteContents();
   }
