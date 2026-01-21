@@ -1,27 +1,23 @@
 import type { NodePartDescriptor, AttributePartDescriptor, TextContentPartDescriptor, TextTemplatePartDescriptor } from './html.js';
 import { createTemplateDescriptor, resolvePath } from './html.js';
 import { PartsTemplate, StandardAttributePart, PropertyAttributePart, EventAttributePart, TemplateAttributePart, NodePart, TextContentPart, TextTemplate, ATTRIBUTE_BINDING, PROPERTY_BINDING } from './parts.js';
-import type { PartRuntime } from './runtime.js';
+import type { SignalsRuntime } from '../runtime.js';
 
 const templateCache = new WeakMap<TemplateStringsArray, PartsTemplate>();
 
 export class TemplateBinding {
   #strings: TemplateStringsArray;
   #values: unknown[];
-  #runtime: PartRuntime;
+  #runtime: SignalsRuntime;
   key?: unknown;
 
-  constructor(strings: TemplateStringsArray, values: unknown[], runtime: PartRuntime) {
+  constructor(strings: TemplateStringsArray, values: unknown[], runtime: SignalsRuntime) {
     this.#strings = strings;
     this.#values = values;
     this.#runtime = runtime;
   }
 
-  static with(runtime: PartRuntime): ((strings: TemplateStringsArray, ...values: unknown[]) => TemplateBinding) & ((key?: unknown) => (strings: TemplateStringsArray, ...values: unknown[]) => TemplateBinding) {
-    const createBinding = (strings: TemplateStringsArray, ...values: unknown[]): TemplateBinding => {
-      return new TemplateBinding(strings, values, runtime);
-    };
-
+  static with(runtime: SignalsRuntime): ((strings: TemplateStringsArray, ...values: unknown[]) => TemplateBinding) & ((key?: unknown) => (strings: TemplateStringsArray, ...values: unknown[]) => TemplateBinding) {
     const htmlFunction = ((stringsOrKey?: TemplateStringsArray | unknown, ...values: unknown[]) => {
       // If called as a template tag: html``
       if (stringsOrKey && typeof stringsOrKey === 'object' && 'raw' in stringsOrKey) {
@@ -49,7 +45,7 @@ export class TemplateBinding {
     return this.#values;
   }
 
-  get runtime(): PartRuntime {
+  get runtime(): SignalsRuntime {
     return this.#runtime;
   }
 
@@ -91,7 +87,7 @@ type Part = NodePart | StandardAttributePart | PropertyAttributePart | EventAttr
 
 type Descriptor = NodePartDescriptor | AttributePartDescriptor | TextContentPartDescriptor | TextTemplatePartDescriptor;
 
-export function create(runtime: PartRuntime, template: PartsTemplate, values: unknown[]): TemplateInstance  {
+export function create(runtime: SignalsRuntime, template: PartsTemplate, values: unknown[]): TemplateInstance  {
   if (template.descriptors.length !== values.length) {
     throw new Error('Template part mismatch.');
   }
@@ -127,7 +123,7 @@ export function create(runtime: PartRuntime, template: PartsTemplate, values: un
   return { fragment, parts, dispose };
 };
 
-function createParts(descriptors: Descriptor[], fragment: DocumentFragment, runtime: PartRuntime): Part[] {
+function createParts(descriptors: Descriptor[], fragment: DocumentFragment, runtime: SignalsRuntime): Part[] {
   const textTemplateCache = new Map<Descriptor, TextTemplate>();
   
   return descriptors.map((descriptor, index) => {

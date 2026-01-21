@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@demo/components": "*",
     "@vanishing/framework": "^0.1.0"
   },
   "devDependencies": {

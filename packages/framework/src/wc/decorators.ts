@@ -1,7 +1,7 @@
-import type { PartRuntime } from '../template/runtime.js';
+import type { SignalsRuntime } from '../runtime.js';
 import type { Signal } from '../reactive/signal.js';
 
-function state<This, Value>(runtime: PartRuntime) {
+function state<This, Value>(runtime: SignalsRuntime) {
   return function<This, Value> (
     target: ClassAccessorDecoratorTarget<This, Value>
   ): ClassAccessorDecoratorResult<This, Value> {

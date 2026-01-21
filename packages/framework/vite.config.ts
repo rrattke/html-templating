@@ -15,6 +15,7 @@ export default defineConfig({
       entry: {
         index: path.resolve(dirname, 'src/index.ts'),
         reactive: path.resolve(dirname, 'src/reactive.ts'),
+        runtime: path.resolve(dirname, 'src/runtime.ts'),
         template: path.resolve(dirname, 'src/template.ts'),
         wc: path.resolve(dirname, 'src/wc.ts')
       },
@@ -26,8 +27,9 @@ export default defineConfig({
     target: 'es2022',
     rollupOptions: {
       output: {
-        entryFileNames: '[name].js',
-        preserveModules: false
+        preserveModules: true,
+        preserveModulesRoot: 'src',
+        entryFileNames: '[name].js'
       }
     }
   },

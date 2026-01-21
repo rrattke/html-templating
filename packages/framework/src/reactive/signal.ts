@@ -38,6 +38,8 @@ function cleanupEffect(effect: EffectRecord): void {
 
 export type Signal<T> = [() => T, (value: WriteValue<T>) => T];
 
+export type Memo<T> = () => T;
+
 interface SignalOptions<T> {
   equals?: boolean | ((prev: T, next: T) => boolean);
 }
@@ -124,8 +126,6 @@ export function onCleanup(fn: CleanupFn): void {
     cleanupStack.push(fn);
   }
 }
-
-export type Memo<T> = () => T;
 
 export function createMemo<T>(fn: () => T): Memo<T> {
   const [memo, setMemo] = createSignal<T>(fn(), { equals: false });

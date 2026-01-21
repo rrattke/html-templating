@@ -13,6 +13,10 @@
       "import": "./lib/reactive.js",
       "types": "./lib/reactive.d.ts"
     },
+    "./runtime": {
+      "import": "./lib/runtime.js",
+      "types": "./lib/runtime.d.ts"
+    },
     "./template": {
       "import": "./lib/template.js",
       "types": "./lib/template.d.ts"

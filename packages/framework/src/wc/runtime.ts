@@ -1,17 +1,17 @@
 /**
- * Runtime facade for template binding.
+ * Runtime facade for web component decorators.
  * Allows runtime to be configured globally by consuming applications.
  */
 
-import { TemplateBinding } from './instantiate.js';
+import { StateDecorator } from './decorators.js';
 
 /**
- * HTML template tag function (delegates to configured runtime).
+ * State decorator (delegates to configured runtime).
  */
-export function html(...args: any[]): any {
+export function state(...args: any[]): any {
   const runtime = globalThis.__SIGNALS_RUNTIME__;
   if (!runtime) {
     throw new Error('Runtime not configured. Call setRuntime() before importing components.');
   }
-  return TemplateBinding.with(runtime)(...args);
+  return (StateDecorator.with(runtime) as any)(...args);
 }

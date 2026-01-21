@@ -1,5 +1,6 @@
-import { ReactiveElement } from '@vanishing/framework';
-import { html, state } from '../runtime/solid-runtime.js';
+import { ReactiveElement } from '@vanishing/framework/wc';
+import { html } from '@vanishing/framework/template';
+import { state } from '@vanishing/framework/wc';
 
 const listStyles = `
   :host {

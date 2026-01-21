@@ -7,10 +7,9 @@ import {
   untrack as solidUntrack,
   onCleanup as solidOnCleanup
 } from 'solid-js';
-import { StateDecorator } from '@vanishing/framework/wc';
-import { PartRuntime, TemplateBinding } from '@vanishing/framework/template';
+import { SignalsRuntime } from '@vanishing/framework/reactive';
 
-export const solidRuntime: PartRuntime = {
+export const solidRuntime: SignalsRuntime = {
   effect(run) {
     return createRoot(dispose => {
       createEffect(run);
@@ -33,6 +32,3 @@ export const solidRuntime: PartRuntime = {
     solidOnCleanup(fn);
   }
 };
-
-export const html = TemplateBinding.with(solidRuntime);
-export const state = StateDecorator.with(solidRuntime);
