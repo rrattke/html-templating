@@ -220,15 +220,20 @@ export class TextTemplate {
 /**
  * Tracks a range of nodes in the DOM using a start marker comment and an end node reference.
  * Content is inserted after the start marker. The end node points to the last inserted node.
- * When empty, both start and end point to the same marker comment.
+ * When empty, both start and end point to the same marker comment (start === end means collapsed/empty).
  */
 class NodeRange {
   #start: Comment;
   #end: Node;
 
-  constructor(marker: Comment) {
-    this.#start = marker;
-    this.#end = marker; // Initially empty
+  /**
+   * Creates a new NodeRange.
+   * @param start The start marker comment node
+   * @param end The end node of the range (defaults to start, creating an empty/collapsed range)
+   */
+  constructor(start: Comment, end?: Node) {
+    this.#start = start;
+    this.#end = end ?? start;
   }
 
   /**
