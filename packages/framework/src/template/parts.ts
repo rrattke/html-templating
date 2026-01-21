@@ -280,9 +280,25 @@ class PropertyBinding implements BindingStrategy {
   }
 }
 
+/**
+ * Binding strategy for boolean attributes (e.g., disabled, checked, hidden).
+ * Always adds/removes the attribute based on truthiness - never sets a value.
+ * Used with the ?attr syntax: ?disabled=${condition}
+ */
+class BooleanAttributeBinding implements BindingStrategy {
+  set(element: Element, name: string, value: unknown): void {
+    if (value) {
+      element.setAttribute(name, '');
+    } else {
+      element.removeAttribute(name);
+    }
+  }
+}
+
 // Module-wide singleton instances (exported for use in instantiate.ts)
 export const ATTRIBUTE_BINDING = new AttributeBinding();
 export const PROPERTY_BINDING = new PropertyBinding();
+export const BOOLEAN_ATTRIBUTE_BINDING = new BooleanAttributeBinding();
 
 export class TextTemplate {
   #strings: string[];
@@ -500,6 +516,7 @@ export class NodePart {
 /**
  * Attribute part for standard HTML attributes.
  * Handles boolean values: null/false removes attribute, true sets empty string.
+ * For strict boolean behavior (always add/remove based on truthiness), use BooleanAttributeBinding.
  */
 export class StandardAttributePart {
   #element: Element;
@@ -535,6 +552,28 @@ export class PropertyAttributePart {
 
   setValue(value: unknown): void {
     this.#strategy.set(this.#element, this.#property, value);
+  }
+}
+
+/**
+ * Attribute part for boolean attributes.
+ * Always adds/removes the attribute based on truthiness of the value.
+ * Used with ?attribute syntax: ?disabled=${condition}
+ * Expects the attribute name without the '?' prefix (e.g., 'disabled' not '?disabled').
+ */
+export class BooleanAttributePart {
+  #element: Element;
+  #name: string;
+  #strategy: BindingStrategy;
+
+  constructor(element: Element, name: string) {
+    this.#element = element;
+    this.#name = name;
+    this.#strategy = BOOLEAN_ATTRIBUTE_BINDING;
+  }
+
+  setValue(value: unknown): void {
+    this.#strategy.set(this.#element, this.#name, value);
   }
 }
 

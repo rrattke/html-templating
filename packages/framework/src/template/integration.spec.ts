@@ -189,4 +189,66 @@ describe('integration tests', () => {
       expect(template.key).toBe(123);
     });
   });
+
+  describe('boolean attribute binding with ?attr syntax', () => {
+    it('should add attribute when value is truthy', () => {
+      const isDisabled = true;
+      const template = html`<button ?disabled=${isDisabled}>Click</button>`;
+      
+      const instance = template.instance();
+      container.appendChild(instance.fragment);
+      
+      const button = container.querySelector('button');
+      expect(button?.hasAttribute('disabled')).toBe(true);
+      expect(button?.getAttribute('disabled')).toBe('');
+    });
+
+    it('should remove attribute when value is falsy', () => {
+      const isDisabled = false;
+      const template = html`<button ?disabled=${isDisabled}>Click</button>`;
+      
+      const instance = template.instance();
+      container.appendChild(instance.fragment);
+      
+      const button = container.querySelector('button');
+      expect(button?.hasAttribute('disabled')).toBe(false);
+    });
+
+    it('should handle null/undefined as falsy', () => {
+      const template1 = html`<input ?checked=${null}>`;
+      const template2 = html`<input ?checked=${undefined}>`;
+      
+      const instance1 = template1.instance();
+      const instance2 = template2.instance();
+      container.appendChild(instance1.fragment);
+      container.appendChild(instance2.fragment);
+      
+      const inputs = container.querySelectorAll('input');
+      expect(inputs[0]?.hasAttribute('checked')).toBe(false);
+      expect(inputs[1]?.hasAttribute('checked')).toBe(false);
+    });
+
+    it('should treat non-boolean truthy values as true', () => {
+      const template = html`<input ?required=${'yes'}>`;
+      
+      const instance = template.instance();
+      container.appendChild(instance.fragment);
+      
+      const input = container.querySelector('input');
+      expect(input?.hasAttribute('required')).toBe(true);
+    });
+
+    it('should handle multiple boolean attributes', () => {
+      const disabled = true;
+      const hidden = false;
+      const template = html`<button ?disabled=${disabled} ?hidden=${hidden}>Click</button>`;
+      
+      const instance = template.instance();
+      container.appendChild(instance.fragment);
+      
+      const button = container.querySelector('button');
+      expect(button?.hasAttribute('disabled')).toBe(true);
+      expect(button?.hasAttribute('hidden')).toBe(false);
+    });
+  });
 });

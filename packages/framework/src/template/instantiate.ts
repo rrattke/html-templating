@@ -1,6 +1,6 @@
 import type { NodePartDescriptor, AttributePartDescriptor, TextContentPartDescriptor, TextTemplatePartDescriptor } from './html.js';
 import { createTemplateDescriptor, resolvePath } from './html.js';
-import { PartsTemplate, StandardAttributePart, PropertyAttributePart, EventAttributePart, TemplateAttributePart, NodePart, TextContentPart, TextTemplate, ATTRIBUTE_BINDING, PROPERTY_BINDING } from './parts.js';
+import { PartsTemplate, StandardAttributePart, PropertyAttributePart, BooleanAttributePart, EventAttributePart, TemplateAttributePart, NodePart, TextContentPart, TextTemplate, ATTRIBUTE_BINDING, PROPERTY_BINDING, BOOLEAN_ATTRIBUTE_BINDING } from './parts.js';
 import type { SignalsRuntime } from '../runtime.js';
 
 const templateCache = new WeakMap<TemplateStringsArray, PartsTemplate>();
@@ -83,7 +83,7 @@ export interface TemplateInstance {
   dispose: () => void;
 }
 
-type Part = NodePart | StandardAttributePart | PropertyAttributePart | EventAttributePart | TemplateAttributePart | TextContentPart;
+type Part = NodePart | StandardAttributePart | PropertyAttributePart | BooleanAttributePart | EventAttributePart | TemplateAttributePart | TextContentPart;
 
 type Descriptor = NodePartDescriptor | AttributePartDescriptor | TextContentPartDescriptor | TextTemplatePartDescriptor;
 
@@ -142,14 +142,21 @@ function createParts(descriptors: Descriptor[], fragment: DocumentFragment, runt
       if (!(element instanceof Element)) {
         throw new Error('Attribute descriptor did not resolve to an element.');
       }
-      // Determine which specialized part to create based on attribute name
+      // Determine which specialized part to create based on attribute name prefix
       if (descriptor.name.startsWith('on')) {
+        // on* → Event handler
         const eventName = descriptor.name.slice(2);
         return new EventAttributePart(element, eventName);
       } else if (descriptor.name.startsWith('.')) {
+        // .property → Property binding
         const propertyName = descriptor.name.slice(1);
         return new PropertyAttributePart(element, propertyName);
+      } else if (descriptor.name.startsWith('?')) {
+        // ?attribute → Boolean attribute (adds/removes based on truthiness)
+        const attributeName = descriptor.name.slice(1);
+        return new BooleanAttributePart(element, attributeName);
       } else {
+        // Regular attribute
         return new StandardAttributePart(element, descriptor.name);
       }
     }
@@ -183,10 +190,20 @@ function createParts(descriptors: Descriptor[], fragment: DocumentFragment, runt
         if (!descriptor.name) {
           throw new Error('TextTemplate attribute descriptor missing name.');
         }
-        // Determine which binding strategy to use based on attribute name
-        const isPropertyBinding = descriptor.name.startsWith('.');
-        const strategy = isPropertyBinding ? PROPERTY_BINDING : ATTRIBUTE_BINDING;
-        const name = isPropertyBinding ? descriptor.name.slice(1) : descriptor.name;
+        // Determine which binding strategy to use based on attribute name prefix
+        let strategy = ATTRIBUTE_BINDING;
+        let name = descriptor.name;
+        
+        if (descriptor.name.startsWith('.')) {
+          // .property → Property binding
+          strategy = PROPERTY_BINDING;
+          name = descriptor.name.slice(1);
+        } else if (descriptor.name.startsWith('?')) {
+          // ?attribute → Boolean attribute binding
+          strategy = BOOLEAN_ATTRIBUTE_BINDING;
+          name = descriptor.name.slice(1);
+        }
+        
         return new TemplateAttributePart(element, name, textTemplate, slotIndex, strategy);
       } else {
         return new TextContentPart(element, textTemplate, slotIndex);
