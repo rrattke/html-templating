@@ -215,18 +215,84 @@ export class TextTemplate {
   }
 }
 
-export class NodePart {
+/**
+ * Tracks a range of nodes in the DOM using a start marker comment and an end node reference.
+ * Content is inserted after the start marker. The end node points to the last inserted node.
+ * When empty, both start and end point to the same marker comment.
+ */
+class NodeRange {
   #start: Comment;
-  #end: Comment;
-  #current: Node | null = null;
+  #end: Node;
+
+  constructor(marker: Comment) {
+    this.#start = marker;
+    this.#end = marker; // Initially empty
+  }
+
+  /**
+   * Removes all nodes from after the start marker up to and including the end node.
+   * After deleting contents, the range is empty (end === start).
+   */
+  deleteContents(): void {
+    if (this.#end === this.#start) {
+      return; // Already empty
+    }
+
+    let node = this.#start.nextSibling;
+    while (node) {
+      const next = node.nextSibling;
+      const isEnd = node === this.#end;
+      node.remove();
+      if (isEnd) {
+        break;
+      }
+      node = next;
+    }
+    this.#end = this.#start;
+  }
+
+  /**
+   * Inserts a node or fragment into the range after deleting existing contents.
+   * Updates end to point to the last inserted node.
+   */
+  insertNode(content: Node): void {
+    this.deleteContents();
+    
+    const parent = this.#start.parentNode;
+    if (!parent) {
+      throw new Error('NodeRange marker is not attached to DOM');
+    }
+
+    if (content instanceof DocumentFragment) {
+      const nodes = Array.from(content.childNodes);
+      if (nodes.length === 0) {
+        // Empty fragment, range remains empty
+        return;
+      }
+      parent.insertBefore(content, this.#start.nextSibling);
+      this.#end = nodes[nodes.length - 1];
+    } else {
+      parent.insertBefore(content, this.#start.nextSibling);
+      this.#end = content;
+    }
+  }
+
+  collapsed(): boolean {
+    return this.#end === this.#start;
+  }
+}
+
+export class NodePart {
+  #marker: Comment;
+  #range: NodeRange;
   #childDisposers: Array<() => void> = [];
   #keyedManager: KeyedChildrenManager | null = null;
 
   constructor(markerNode: Comment) {
     const doc = markerNode.ownerDocument;
-    this.#start = doc.createComment('part-start');
-    this.#end = doc.createComment('part-end');
-    markerNode.replaceWith(this.#start, this.#end);
+    this.#marker = doc.createComment('part');
+    markerNode.replaceWith(this.#marker);
+    this.#range = new NodeRange(this.#marker);
   }
 
   setValue(value: unknown): void {
@@ -273,7 +339,7 @@ export class NodePart {
   }
 
   #commitIterableEntries(values: unknown[]): void {
-    const fragment = this.#end.ownerDocument.createDocumentFragment();
+    const fragment = this.#marker.ownerDocument.createDocumentFragment();
     for (const value of values) {
       this.#appendIterableValue(fragment, value);
     }
@@ -281,20 +347,19 @@ export class NodePart {
   }
 
   #commitKeyed(value: TemplateBinding | TemplateBinding[]): void {
-    const parent = this.#end.parentNode;
+    const parent = this.#marker.parentNode;
     if (!parent) {
       return;
     }
     if (!this.#keyedManager) {
       // Transitioning from non-keyed to keyed - clear non-keyed content
       this.#disposeChildren();
-      this.#clearRange();
-      this.#keyedManager = new KeyedChildrenManager(this.#end);
+      this.#range.deleteContents();
+      this.#keyedManager = new KeyedChildrenManager(this.#marker);
     }
     
     this.#keyedManager.update(value);
     this.#childDisposers = this.#keyedManager.getDisposers();
-    this.#current = null;
   }
 
   #appendIterableValue(target: DocumentFragment, value: unknown): void {
@@ -317,7 +382,7 @@ export class NodePart {
       target.appendChild(value);
       return;
     }
-    target.appendChild(this.#end.ownerDocument.createTextNode(String(value)));
+    target.appendChild(this.#marker.ownerDocument.createTextNode(String(value)));
   }
 
   #disposeChildren(): void {
@@ -334,41 +399,16 @@ export class NodePart {
     this.#keyedManager.clear();
     this.#keyedManager = null;
     this.#childDisposers = [];
-    this.#current = null;
+    this.#range.deleteContents();
   }
 
   #commitText(text: string): void {
-    if (this.#current instanceof Text) {
-      if (this.#current.data !== text) {
-        this.#current.data = text;
-      }
-      return;
-    }
-    const node = this.#end.ownerDocument.createTextNode(text);
-    this.#setNode(node);
+    const node = this.#marker.ownerDocument.createTextNode(text);
+    this.#range.insertNode(node);
   }
 
   #commitNode(node: Node): void {
-    if (this.#current === node) {
-      return;
-    }
-    this.#setNode(node);
-  }
-
-  #setNode(node: Node): void {
-    this.#clearRange();
-    this.#end.parentNode?.insertBefore(node, this.#end);
-    this.#current = node;
-  }
-
-  #clearRange(): void {
-    let pointer = this.#start.nextSibling;
-    while (pointer && pointer !== this.#end) {
-      const next = pointer.nextSibling;
-      pointer.remove();
-      pointer = next;
-    }
-    this.#current = null;
+    this.#range.insertNode(node);
   }
 }
 
