@@ -310,4 +310,329 @@ describe('Template to Part Translation', () => {
       }
     });
   });
+
+  describe('Nested Templates', () => {
+    let container: HTMLElement;
+
+    beforeEach(() => {
+      container = document.createElement('div');
+      document.body.appendChild(container);
+    });
+
+    it('should render nested template as child content', () => {
+      const inner = html`<span>Inner</span>`;
+      const outer = html`<div>${inner}</div>`;
+      
+      const instance = outer.instance();
+      container.appendChild(instance.fragment);
+      
+      const div = container.querySelector('div');
+      const span = div?.querySelector('span');
+      expect(span?.textContent).toBe('Inner');
+    });
+
+    it('should render multiple nested templates', () => {
+      const first = html`<span>First</span>`;
+      const second = html`<span>Second</span>`;
+      const outer = html`<div>${first}${second}</div>`;
+      
+      const instance = outer.instance();
+      container.appendChild(instance.fragment);
+      
+      const spans = container.querySelectorAll('span');
+      expect(spans).toHaveLength(2);
+      expect(spans[0].textContent).toBe('First');
+      expect(spans[1].textContent).toBe('Second');
+    });
+
+    it('should render deeply nested templates', () => {
+      const innermost = html`<em>Deep</em>`;
+      const middle = html`<span>${innermost}</span>`;
+      const outer = html`<div>${middle}</div>`;
+      
+      const instance = outer.instance();
+      container.appendChild(instance.fragment);
+      
+      const em = container.querySelector('em');
+      expect(em?.textContent).toBe('Deep');
+    });
+
+    it('should mix nested templates with static content', () => {
+      const nested = html`<strong>Bold</strong>`;
+      const template = html`<p>Start ${nested} End</p>`;
+      
+      const instance = template.instance();
+      container.appendChild(instance.fragment);
+      
+      const p = container.querySelector('p');
+      const strong = p?.querySelector('strong');
+      expect(strong?.textContent).toBe('Bold');
+      expect(p?.textContent).toContain('Start');
+      expect(p?.textContent).toContain('End');
+    });
+
+    it('should handle conditional nested templates', () => {
+      const condition = true;
+      const nested = html`<span>Conditional</span>`;
+      const template = html`<div>${condition && nested}</div>`;
+      
+      const instance = template.instance();
+      container.appendChild(instance.fragment);
+      
+      const span = container.querySelector('span');
+      expect(span?.textContent).toBe('Conditional');
+    });
+
+    it('should handle nested templates with attributes', () => {
+      const inner = html`<button @click=${() => {}} ?disabled=${false}>Click</button>`;
+      const outer = html`<div class=${'container'}>${inner}</div>`;
+      
+      const instance = outer.instance();
+      container.appendChild(instance.fragment);
+      
+      const button = container.querySelector('button');
+      expect(button).toBeDefined();
+      expect(button?.hasAttribute('disabled')).toBe(false);
+    });
+  });
+
+  describe('Template Iteration', () => {
+    let container: HTMLElement;
+
+    beforeEach(() => {
+      container = document.createElement('div');
+      document.body.appendChild(container);
+    });
+
+    it('should render array of templates', () => {
+      const items = ['One', 'Two', 'Three'];
+      const templates = items.map(item => html`<li>${item}</li>`);
+      const template = html`<ul>${templates}</ul>`;
+      
+      const instance = template.instance();
+      container.appendChild(instance.fragment);
+      
+      const lis = container.querySelectorAll('li');
+      expect(lis).toHaveLength(3);
+      expect(lis[0].textContent).toBe('One');
+      expect(lis[1].textContent).toBe('Two');
+      expect(lis[2].textContent).toBe('Three');
+    });
+
+    it('should render array of keyed templates', () => {
+      const items = [
+        { id: 1, text: 'First' },
+        { id: 2, text: 'Second' },
+        { id: 3, text: 'Third' }
+      ];
+      const templates = items.map(item => html(item.id)`<li>${item.text}</li>`);
+      const template = html`<ul>${templates}</ul>`;
+      
+      const instance = template.instance();
+      container.appendChild(instance.fragment);
+      
+      const lis = container.querySelectorAll('li');
+      expect(lis).toHaveLength(3);
+      expect(lis[0].textContent).toBe('First');
+      expect(lis[1].textContent).toBe('Second');
+      expect(lis[2].textContent).toBe('Third');
+    });
+
+    it('should render empty array', () => {
+      const items: string[] = [];
+      const templates = items.map(item => html`<li>${item}</li>`);
+      const template = html`<ul>${templates}</ul>`;
+      
+      const instance = template.instance();
+      container.appendChild(instance.fragment);
+      
+      const lis = container.querySelectorAll('li');
+      expect(lis).toHaveLength(0);
+    });
+
+    it('should render mixed array of primitives and templates', () => {
+      const mixed = [
+        'Text',
+        html`<span>Template</span>`,
+        42,
+        html`<strong>Bold</strong>`
+      ];
+      const template = html`<div>${mixed}</div>`;
+      
+      const instance = template.instance();
+      container.appendChild(instance.fragment);
+      
+      const div = container.querySelector('div');
+      expect(div?.textContent).toContain('Text');
+      expect(div?.textContent).toContain('Template');
+      expect(div?.textContent).toContain('42');
+      expect(div?.textContent).toContain('Bold');
+      expect(div?.querySelector('span')).toBeDefined();
+      expect(div?.querySelector('strong')).toBeDefined();
+    });
+
+    it('should handle array.map inline with template creation', () => {
+      const numbers = [1, 2, 3];
+      const template = html`<ul>${numbers.map(n => html`<li>${n * 2}</li>`)}</ul>`;
+      
+      const instance = template.instance();
+      container.appendChild(instance.fragment);
+      
+      const lis = container.querySelectorAll('li');
+      expect(lis).toHaveLength(3);
+      expect(lis[0].textContent).toBe('2');
+      expect(lis[1].textContent).toBe('4');
+      expect(lis[2].textContent).toBe('6');
+    });
+
+    it('should render nested iterations', () => {
+      const groups = [
+        { name: 'Group A', items: ['A1', 'A2'] },
+        { name: 'Group B', items: ['B1', 'B2', 'B3'] }
+      ];
+      
+      const template = html`
+        <div>
+          ${groups.map(group => html`
+            <div class=${'group'}>
+              <h3>${group.name}</h3>
+              <ul>${group.items.map(item => html`<li>${item}</li>`)}</ul>
+            </div>
+          `)}
+        </div>
+      `;
+      
+      const instance = template.instance();
+      container.appendChild(instance.fragment);
+      
+      const groupDivs = container.querySelectorAll('.group');
+      expect(groupDivs).toHaveLength(2);
+      
+      const firstGroupLis = groupDivs[0].querySelectorAll('li');
+      expect(firstGroupLis).toHaveLength(2);
+      expect(firstGroupLis[0].textContent).toBe('A1');
+      
+      const secondGroupLis = groupDivs[1].querySelectorAll('li');
+      expect(secondGroupLis).toHaveLength(3);
+      expect(secondGroupLis[0].textContent).toBe('B1');
+    });
+
+    it('should handle keyed templates with attributes in iteration', () => {
+      const todos = [
+        { id: 1, text: 'Buy milk', done: true },
+        { id: 2, text: 'Walk dog', done: false }
+      ];
+      
+      const template = html`
+        <ul>
+          ${todos.map(todo => html(todo.id)`
+            <li>
+              <input type="checkbox" .checked=${todo.done}>
+              <span>${todo.text}</span>
+            </li>
+          `)}
+        </ul>
+      `;
+      
+      const instance = template.instance();
+      container.appendChild(instance.fragment);
+      
+      const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+      expect(checkboxes).toHaveLength(2);
+      expect((checkboxes[0] as HTMLInputElement).checked).toBe(true);
+      expect((checkboxes[1] as HTMLInputElement).checked).toBe(false);
+      
+      const spans = container.querySelectorAll('span');
+      expect(spans[0].textContent).toBe('Buy milk');
+      expect(spans[1].textContent).toBe('Walk dog');
+    });
+
+    it('should handle conditional rendering in iterations', () => {
+      const items = [
+        { id: 1, text: 'Visible', show: true },
+        { id: 2, text: 'Hidden', show: false },
+        { id: 3, text: 'Also Visible', show: true }
+      ];
+      
+      const template = html`
+        <ul>
+          ${items.map(item => item.show && html(item.id)`<li>${item.text}</li>`)}
+        </ul>
+      `;
+      
+      const instance = template.instance();
+      container.appendChild(instance.fragment);
+      
+      const lis = container.querySelectorAll('li');
+      expect(lis).toHaveLength(2);
+      expect(lis[0].textContent).toBe('Visible');
+      expect(lis[1].textContent).toBe('Also Visible');
+    });
+
+    it('should handle keyed templates with event handlers', () => {
+      let clickedId: number | null = null;
+      const buttons = [
+        { id: 1, label: 'First' },
+        { id: 2, label: 'Second' }
+      ];
+      
+      const template = html`
+        <div>
+          ${buttons.map(btn => html(btn.id)`
+            <button @click=${() => { clickedId = btn.id; }}>${btn.label}</button>
+          `)}
+        </div>
+      `;
+      
+      const instance = template.instance();
+      container.appendChild(instance.fragment);
+      
+      const allButtons = container.querySelectorAll('button');
+      expect(allButtons).toHaveLength(2);
+      
+      allButtons[1].click();
+      expect(clickedId).toBe(2);
+    });
+
+    it('should handle large arrays efficiently', () => {
+      const items = Array.from({ length: 100 }, (_, i) => ({ id: i, value: `Item ${i}` }));
+      const template = html`
+        <ul>
+          ${items.map(item => html(item.id)`<li>${item.value}</li>`)}
+        </ul>
+      `;
+      
+      const instance = template.instance();
+      container.appendChild(instance.fragment);
+      
+      const lis = container.querySelectorAll('li');
+      expect(lis).toHaveLength(100);
+      expect(lis[0].textContent).toBe('Item 0');
+      expect(lis[99].textContent).toBe('Item 99');
+    });
+
+    it('should handle filter + map operations', () => {
+      const items = [
+        { id: 1, text: 'Apple', visible: true },
+        { id: 2, text: 'Banana', visible: false },
+        { id: 3, text: 'Cherry', visible: true }
+      ];
+      
+      const template = html`
+        <ul>
+          ${items
+            .filter(item => item.visible)
+            .map(item => html(item.id)`<li>${item.text}</li>`)}
+        </ul>
+      `;
+      
+      const instance = template.instance();
+      container.appendChild(instance.fragment);
+      
+      const lis = container.querySelectorAll('li');
+      expect(lis).toHaveLength(2);
+      expect(lis[0].textContent).toBe('Apple');
+      expect(lis[1].textContent).toBe('Cherry');
+    });
+  });
 });
