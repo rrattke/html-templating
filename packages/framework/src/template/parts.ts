@@ -20,8 +20,7 @@ export class PartsTemplate {
 }
 
 interface KeyedChild {
-  start: Comment;
-  end: Comment;
+  range: NodeRange;
   dispose: () => void;
 }
 
@@ -45,12 +44,12 @@ interface KeyedChild {
  * - Display labels (unless guaranteed to be unique and stable)
  */
 class ListManager {
-  #anchor: Comment;
+  #range: NodeRange;
   #items: Map<unknown, KeyedChild> = new Map();
   #disposers: Array<() => void> = [];
 
-  constructor(anchor: Comment) {
-    this.#anchor = anchor;
+  constructor(range: NodeRange) {
+    this.#range = range;
   }
 
   /**
@@ -60,13 +59,13 @@ class ListManager {
    */
   update(value: TemplateBinding | TemplateBinding[]): void {
     const entries = Array.isArray(value) ? value : [value];
-    const parent = this.#anchor.parentNode;
+    const parent = this.#range.start.parentNode;
     if (!parent) {
       return;
     }
 
     const seen = new Set<unknown>();
-    let anchor: ChildNode | null = this.#anchor;
+    let anchor: ChildNode | null = this.#range.start;
 
     // Process entries in reverse order to maintain correct DOM order
     for (let i = entries.length - 1; i >= 0; i--) {
@@ -77,13 +76,13 @@ class ListManager {
       if (existing) {
         // Reuse existing child, move to correct position
         this.#moveItem(existing, anchor);
-        anchor = existing.start;
+        anchor = existing.range.start;
       } else {
         // Create new child
         const child = this.#createItem(entry, anchor);
         this.#items.set(key, child);
         this.#disposers.push(child.dispose);
-        anchor = child.start;
+        anchor = child.range.start;
       }
       seen.add(key);
     }
@@ -121,27 +120,29 @@ class ListManager {
 
   #createItem(binding: TemplateBinding, anchor: ChildNode | null): KeyedChild {
     const { fragment, dispose } = binding.instance();
-    const doc = this.#anchor.ownerDocument;
-    const start = doc.createComment('key-start');
-    const end = doc.createComment('key-end');
-    const wrapper = doc.createDocumentFragment();
-    wrapper.append(start);
-    wrapper.append(fragment);
-    wrapper.append(end);
-    this.#anchor.parentNode?.insertBefore(wrapper, anchor);
-    return { start, end, dispose };
+    const marker = this.#range.ownerDocument.createComment('item');
+    this.#range.start.parentNode?.insertBefore(marker, anchor);
+    
+    const range = new NodeRange(marker);
+    range.insertNode(fragment);
+    
+    return { range, dispose };
   }
 
   #moveItem(child: KeyedChild, anchor: ChildNode | null): void {
-    const parent = this.#anchor.parentNode;
+    const parent = this.#range.start.parentNode;
     if (!parent) {
       return;
     }
-    let node: ChildNode | null = child.start;
+    
+    // Move all nodes in the range (marker + content)
+    let node: ChildNode | null = child.range.start;
+    const endNode = child.range.end;
+    
     while (node) {
       const next: ChildNode | null = node.nextSibling;
       parent.insertBefore(node, anchor);
-      if (node === child.end) {
+      if (node === endNode) {
         break;
       }
       node = next;
@@ -150,15 +151,8 @@ class ListManager {
 
   #removeItem(child: KeyedChild): void {
     child.dispose();
-    let node: ChildNode | null = child.start;
-    while (node) {
-      const next: ChildNode | null = node.nextSibling;
-      node.remove();
-      if (node === child.end) {
-        break;
-      }
-      node = next;
-    }
+    child.range.deleteContents();
+    child.range.start.remove();
   }
 }
 
@@ -371,7 +365,7 @@ export class NodePart {
       // Transitioning from non-keyed to keyed - clear non-keyed content
       this.#disposeChildren();
       this.#range.deleteContents();
-      this.#listManager = new ListManager(this.#range.start);
+      this.#listManager = new ListManager(this.#range);
     }
     
     this.#listManager.update(value);
