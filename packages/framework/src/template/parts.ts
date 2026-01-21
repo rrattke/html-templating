@@ -31,7 +31,7 @@ interface KeyedChild {
  */
 class ListManager {
   #anchor: Comment;
-  #keyedChildren: Map<unknown, KeyedChild> = new Map();
+  #items: Map<unknown, KeyedChild> = new Map();
   #disposers: Array<() => void> = [];
 
   constructor(anchor: Comment) {
@@ -57,16 +57,16 @@ class ListManager {
     for (let i = entries.length - 1; i >= 0; i--) {
       const entry = entries[i];
       const key = entry.key!;
-      const existing = this.#keyedChildren.get(key);
+      const existing = this.#items.get(key);
 
       if (existing) {
         // Reuse existing child, move to correct position
-        this.#moveKeyedChild(existing, anchor);
+        this.#moveItem(existing, anchor);
         anchor = existing.start;
       } else {
         // Create new child
-        const child = this.#createKeyedChild(entry, anchor);
-        this.#keyedChildren.set(key, child);
+        const child = this.#createItem(entry, anchor);
+        this.#items.set(key, child);
         this.#disposers.push(child.dispose);
         anchor = child.start;
       }
@@ -74,14 +74,14 @@ class ListManager {
     }
 
     // Remove children that are no longer present
-    for (const [key, child] of Array.from(this.#keyedChildren.entries())) {
+    for (const [key, child] of Array.from(this.#items.entries())) {
       if (!seen.has(key)) {
         const disposeIndex = this.#disposers.indexOf(child.dispose);
         if (disposeIndex !== -1) {
           this.#disposers.splice(disposeIndex, 1);
         }
-        this.#removeKeyedChild(child);
-        this.#keyedChildren.delete(key);
+        this.#removeItem(child);
+        this.#items.delete(key);
       }
     }
   }
@@ -90,10 +90,10 @@ class ListManager {
    * Clears all keyed children and resets state.
    */
   clear(): void {
-    for (const child of this.#keyedChildren.values()) {
-      this.#removeKeyedChild(child);
+    for (const child of this.#items.values()) {
+      this.#removeItem(child);
     }
-    this.#keyedChildren.clear();
+    this.#items.clear();
     this.#disposers = [];
   }
 
@@ -101,10 +101,10 @@ class ListManager {
    * Returns true if this manager has any keyed children.
    */
   hasChildren(): boolean {
-    return this.#keyedChildren.size > 0;
+    return this.#items.size > 0;
   }
 
-  #createKeyedChild(binding: TemplateBinding, anchor: ChildNode | null): KeyedChild {
+  #createItem(binding: TemplateBinding, anchor: ChildNode | null): KeyedChild {
     const { fragment, dispose } = binding.instance();
     const doc = this.#anchor.ownerDocument;
     const start = doc.createComment('key-start');
@@ -117,7 +117,7 @@ class ListManager {
     return { start, end, dispose };
   }
 
-  #moveKeyedChild(child: KeyedChild, anchor: ChildNode | null): void {
+  #moveItem(child: KeyedChild, anchor: ChildNode | null): void {
     const parent = this.#anchor.parentNode;
     if (!parent) {
       return;
@@ -133,7 +133,7 @@ class ListManager {
     }
   }
 
-  #removeKeyedChild(child: KeyedChild): void {
+  #removeItem(child: KeyedChild): void {
     child.dispose();
     let node: ChildNode | null = child.start;
     while (node) {
