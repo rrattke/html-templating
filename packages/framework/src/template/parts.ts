@@ -280,19 +280,30 @@ class NodeRange {
   collapsed(): boolean {
     return this.#end === this.#start;
   }
+
+  get start(): Comment {
+    return this.#start;
+  }
+
+  get end(): Node {
+    return this.#end;
+  }
+
+  get ownerDocument(): Document {
+    return this.#start.ownerDocument;
+  }
 }
 
 export class NodePart {
-  #marker: Comment;
   #range: NodeRange;
   #childDisposers: Array<() => void> = [];
   #keyedManager: KeyedChildrenManager | null = null;
 
   constructor(markerNode: Comment) {
     const doc = markerNode.ownerDocument;
-    this.#marker = doc.createComment('part');
-    markerNode.replaceWith(this.#marker);
-    this.#range = new NodeRange(this.#marker);
+    const marker = doc.createComment('part');
+    markerNode.replaceWith(marker);
+    this.#range = new NodeRange(marker);
   }
 
   setValue(value: unknown): void {
@@ -339,7 +350,7 @@ export class NodePart {
   }
 
   #commitIterableEntries(values: unknown[]): void {
-    const fragment = this.#marker.ownerDocument.createDocumentFragment();
+    const fragment = this.#range.ownerDocument.createDocumentFragment();
     for (const value of values) {
       this.#appendIterableValue(fragment, value);
     }
@@ -347,7 +358,7 @@ export class NodePart {
   }
 
   #commitKeyed(value: TemplateBinding | TemplateBinding[]): void {
-    const parent = this.#marker.parentNode;
+    const parent = this.#range.start.parentNode;
     if (!parent) {
       return;
     }
@@ -355,7 +366,7 @@ export class NodePart {
       // Transitioning from non-keyed to keyed - clear non-keyed content
       this.#disposeChildren();
       this.#range.deleteContents();
-      this.#keyedManager = new KeyedChildrenManager(this.#marker);
+      this.#keyedManager = new KeyedChildrenManager(this.#range.start);
     }
     
     this.#keyedManager.update(value);
@@ -382,7 +393,7 @@ export class NodePart {
       target.appendChild(value);
       return;
     }
-    target.appendChild(this.#marker.ownerDocument.createTextNode(String(value)));
+    target.appendChild(this.#range.ownerDocument.createTextNode(String(value)));
   }
 
   #disposeChildren(): void {
@@ -403,7 +414,7 @@ export class NodePart {
   }
 
   #commitText(text: string): void {
-    const node = this.#marker.ownerDocument.createTextNode(text);
+    const node = this.#range.ownerDocument.createTextNode(text);
     this.#range.insertNode(node);
   }
 
