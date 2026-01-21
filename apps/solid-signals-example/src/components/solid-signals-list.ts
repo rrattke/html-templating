@@ -77,14 +77,20 @@ const listStyles = `
 
 export class SolidSignalsList extends ReactiveElement {
   @state
-  accessor items = ['Adapter spike', 'Solid runtime', 'Docs refresh'];
+  accessor items = [
+    { id: 1, label: 'Adapter spike' },
+    { id: 2, label: 'Solid runtime' },
+    { id: 3, label: 'Docs refresh' }
+  ];
+  
+  #nextId = 4;
 
   #addItem(): void {
-    this.items = [...this.items, `Task #${this.items.length + 1}`];
+    this.items = [...this.items, { id: this.#nextId++, label: `Task #${this.items.length + 1}` }];
   }
 
-  #removeItem(label: string): void {
-    this.items = this.items.filter(item => item !== label);
+  #removeItem(id: number): void {
+    this.items = this.items.filter(item => item.id !== id);
   }
 
   template() {
@@ -98,10 +104,10 @@ export class SolidSignalsList extends ReactiveElement {
         <button type="button" onclick=${() => this.#addItem()}>Add Task</button>
       </div>
         <ul>
-          ${() => this.items.map(label => html(label)`
+          ${() => this.items.map(item => html(item.id)`
             <li>
-              <span>${label}</span>
-              <button type="button" onclick=${() => this.#removeItem(label)}>Remove</button>
+              <span>${item.label}</span>
+              <button type="button" onclick=${() => this.#removeItem(item.id)}>Remove</button>
             </li>
           `)}
         </ul>

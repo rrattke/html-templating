@@ -28,6 +28,21 @@ interface KeyedChild {
 /**
  * Manages keyed template instances for efficient DOM updates.
  * Handles creation, reordering, and disposal of keyed children.
+ * 
+ * IMPORTANT: Keys must be unique and stable. When the same key appears in multiple
+ * updates, the existing DOM instance is reused and moved, not recreated. This means:
+ * - Keys should uniquely identify each item across all updates
+ * - Reusing a key will reuse the existing DOM element (no new instance created)
+ * - Key collisions will cause unexpected behavior (items appearing in wrong positions)
+ * 
+ * Good key strategies:
+ * - Unique IDs (UUIDs, database IDs, incrementing counters)
+ * - Stable item properties (user.id, product.sku)
+ * 
+ * Bad key strategies:
+ * - Array indices (changes when items are reordered/removed)
+ * - Derived values that can collide (item.length + 1, current timestamp)
+ * - Display labels (unless guaranteed to be unique and stable)
  */
 class ListManager {
   #anchor: Comment;

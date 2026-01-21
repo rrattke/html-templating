@@ -77,14 +77,20 @@ const listStyles = `
 
 export class NativeList extends ReactiveElement {
   @state
-  accessor items = ['Framework Goals', 'Runtime Swap', 'Docs Polish'];
+  accessor items = [
+    { id: 1, label: 'Framework Goals' },
+    { id: 2, label: 'Runtime Swap' },
+    { id: 3, label: 'Docs Polish' }
+  ];
+  
+  #nextId = 4;
 
   #addItem(): void {
-    this.items = [...this.items, `Todo #${this.items.length + 1}`];
+    this.items = [...this.items, { id: this.#nextId++, label: `Todo #${this.items.length + 1}` }];
   }
 
-  #removeItem(label: string): void {
-    this.items = this.items.filter(item => item !== label);
+  #removeItem(id: number): void {
+    this.items = this.items.filter(item => item.id !== id);
   }
 
   template() {
@@ -98,10 +104,10 @@ export class NativeList extends ReactiveElement {
         <button type="button" onclick=${() => this.#addItem()}>Add Item</button>
       </div>
       <ul>
-        ${() => this.items.map(label => html(label)`
+        ${() => this.items.map(item => html(item.id)`
           <li>
-            <span>${label}</span>
-            <button type="button" onclick=${() => this.#removeItem(label)}>Remove</button>
+            <span>${item.label}</span>
+            <button type="button" onclick=${() => this.#removeItem(item.id)}>Remove</button>
           </li>
         `)}
       </ul>

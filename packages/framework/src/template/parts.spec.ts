@@ -333,20 +333,25 @@ describe('NodePart - Keyed Templates', () => {
 
   // Mock TemplateBinding for testing
   function createMockBinding(key: unknown, content: string): any {
-    const fragment = document.createDocumentFragment();
-    const text = document.createTextNode(content);
-    fragment.appendChild(text);
-    
+    let instanceCallCount = 0;
     let disposeCallCount = 0;
+    
     const binding = {
       key,
-      instance: () => ({
-        fragment,
-        dispose: () => { disposeCallCount++; }
-      }),
+      instance: () => {
+        instanceCallCount++;
+        const fragment = document.createDocumentFragment();
+        const text = document.createTextNode(content);
+        fragment.appendChild(text);
+        return {
+          fragment,
+          dispose: () => { disposeCallCount++; }
+        };
+      },
       strings: ['mock'],
       values: [content],
-      _disposeCallCount: () => disposeCallCount
+      _disposeCallCount: () => disposeCallCount,
+      _instanceCallCount: () => instanceCallCount
     };
     return binding;
   }
@@ -635,6 +640,113 @@ describe('NodePart - Keyed Templates', () => {
       
       // Should reuse based on keys
       expect(container.textContent).toBe('NumberStringBoolean');
+    });
+
+    it('should insert re-added item at correct position, not old location', () => {
+      // Create initial list with 3 items: A, B, C
+      const bindings1 = [
+        createMockBinding('a', 'A'),
+        createMockBinding('b', 'B'),
+        createMockBinding('c', 'C')
+      ];
+      part.setValue(bindings1);
+      expect(container.textContent).toBe('ABC');
+      expect(bindings1[1]._instanceCallCount()).toBe(1); // B created once
+      
+      // Remove item B (list becomes A, C)
+      const bindings2 = [
+        createMockBinding('a', 'A'),
+        createMockBinding('c', 'C')
+      ];
+      part.setValue(bindings2);
+      expect(container.textContent).toBe('AC');
+      expect(bindings1[1]._disposeCallCount()).toBe(1); // B disposed
+      
+      // Re-add B at the end (list should become A, C, B)
+      const bindings3 = [
+        createMockBinding('a', 'A'),
+        createMockBinding('c', 'C'),
+        createMockBinding('b', 'B-new')
+      ];
+      part.setValue(bindings3);
+      
+      // B should appear at the end, not in its old position
+      expect(container.textContent).toBe('ACB-new');
+      // Verify that B's instance() was called again (creating new instance)
+      expect(bindings3[2]._instanceCallCount()).toBe(1);
+      
+      // Test another reordering: move B to the start (B, A, C)
+      const bindings4 = [
+        createMockBinding('b', 'B-start'),
+        createMockBinding('a', 'A'),
+        createMockBinding('c', 'C')
+      ];
+      part.setValue(bindings4);
+      
+      // B should be at the start
+      // Since it's still the same key 'b', it should reuse the instance from bindings3
+      expect(container.textContent).toBe('B-newAC');
+      // Instance should be reused (moved), not recreated
+      expect(bindings4[0]._instanceCallCount()).toBe(0); // Different binding object, not called
+    });
+
+    it('should handle remove and re-add of multiple items correctly', () => {
+      // Initial: A, B, C, D
+      const bindings1 = [
+        createMockBinding('a', 'A'),
+        createMockBinding('b', 'B'),
+        createMockBinding('c', 'C'),
+        createMockBinding('d', 'D')
+      ];
+      part.setValue(bindings1);
+      expect(container.textContent).toBe('ABCD');
+      
+      // Remove B and D: A, C
+      const bindings2 = [
+        createMockBinding('a', 'A'),
+        createMockBinding('c', 'C')
+      ];
+      part.setValue(bindings2);
+      expect(container.textContent).toBe('AC');
+      
+      // Re-add B at start and D in middle: B, A, D, C
+      const bindings3 = [
+        createMockBinding('b', 'B-new'),
+        createMockBinding('a', 'A'),
+        createMockBinding('d', 'D-new'),
+        createMockBinding('c', 'C')
+      ];
+      part.setValue(bindings3);
+      
+      // Items should appear in the new order
+      expect(container.textContent).toBe('B-newAD-newC');
+    });
+
+    it('should handle key collision - reuses existing item with same key', () => {
+      // This test documents the expected behavior when the same key appears again
+      // Scenario: Items ["Item1", "Item3"] exist, then trying to add another "Item3"
+      
+      const bindings1 = [
+        createMockBinding('item1', 'Content1'),
+        createMockBinding('item3', 'Content3-original')
+      ];
+      part.setValue(bindings1);
+      expect(container.textContent).toBe('Content1Content3-original');
+      
+      // Now add another binding with key 'item3' but different content
+      // The ListManager should REUSE the existing item3 instance
+      const bindings2 = [
+        createMockBinding('item1', 'Content1'),
+        createMockBinding('item3', 'Content3-new-attempt'),
+        createMockBinding('item2', 'Content2')
+      ];
+      part.setValue(bindings2);
+      
+      // The existing item3 DOM is reused, so it keeps the old content
+      // The new binding's instance() is never called
+      expect(container.textContent).toBe('Content1Content3-originalContent2');
+      // Verify the new binding for item3 was never instantiated
+      expect(bindings2[1]._instanceCallCount()).toBe(0);
     });
   });
 });
