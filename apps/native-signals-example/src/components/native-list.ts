@@ -66,12 +66,34 @@ const listStyles = `
   li span {
     font-weight: 500;
   }
+  li .controls {
+    display: flex;
+    gap: 0.4rem;
+  }
   li button {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.85rem;
+  }
+  li button.remove {
     background: rgba(244, 63, 94, 0.18);
     color: #be123c;
   }
-  li button:hover {
+  li button.remove:hover {
     background: rgba(244, 63, 94, 0.28);
+  }
+  li button.move {
+    background: rgba(99, 102, 241, 0.15);
+    color: #4c1d95;
+  }
+  li button.move:hover {
+    background: rgba(99, 102, 241, 0.28);
+  }
+  li button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  li button:disabled:hover {
+    transform: none;
   }
 `;
 
@@ -93,6 +115,24 @@ export class NativeList extends ReactiveElement {
     this.items = this.items.filter(item => item.id !== id);
   }
 
+  #moveUp(id: number): void {
+    const index = this.items.findIndex(item => item.id === id);
+    if (index > 0) {
+      const newItems = [...this.items];
+      [newItems[index - 1], newItems[index]] = [newItems[index], newItems[index - 1]];
+      this.items = newItems;
+    }
+  }
+
+  #moveDown(id: number): void {
+    const index = this.items.findIndex(item => item.id === id);
+    if (index >= 0 && index < this.items.length - 1) {
+      const newItems = [...this.items];
+      [newItems[index], newItems[index + 1]] = [newItems[index + 1], newItems[index]];
+      this.items = newItems;
+    }
+  }
+
   template() {
     return html`
       <style>${listStyles}</style>
@@ -104,10 +144,14 @@ export class NativeList extends ReactiveElement {
         <button type="button" onclick=${() => this.#addItem()}>Add Item</button>
       </div>
       <ul>
-        ${() => this.items.map(item => html(item.id)`
+        ${() => this.items.map((item, index) => html(item.id)`
           <li>
             <span>${item.label}</span>
-            <button type="button" onclick=${() => this.#removeItem(item.id)}>Remove</button>
+            <div class="controls">
+              <button type="button" class="move" onclick=${() => this.#moveUp(item.id)} ?disabled=${index === 0}>↑</button>
+              <button type="button" class="move" onclick=${() => this.#moveDown(item.id)} ?disabled=${index === this.items.length - 1}>↓</button>
+              <button type="button" class="remove" onclick=${() => this.#removeItem(item.id)}>Remove</button>
+            </div>
           </li>
         `)}
       </ul>
