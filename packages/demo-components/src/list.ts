@@ -134,6 +134,14 @@ export class List extends ReactiveElement {
     }
   }
 
+  #isFirst(id: number): boolean {
+    return this.items[0]?.id === id;
+  }
+
+  #isLast(id: number): boolean {
+    return this.items[this.items.length - 1]?.id === id;
+  }
+
   template() {
     return html`
       <style>${listStyles}</style>
@@ -149,8 +157,8 @@ export class List extends ReactiveElement {
           <li>
             <span>${item.label}</span>
             <div class="controls">
-              <button type="button" class="move" onclick=${() => this.#moveUp(item.id)} ?disabled=${index === 0}>↑</button>
-              <button type="button" class="move" onclick=${() => this.#moveDown(item.id)} ?disabled=${index === this.items.length - 1}>↓</button>
+              <button type="button" class="move" onclick=${() => this.#moveUp(item.id)} ?disabled=${() => this.#isFirst(item.id)}>↑</button>
+              <button type="button" class="move" onclick=${() => this.#moveDown(item.id)} ?disabled=${() => this.#isLast(item.id)}>↓</button>
               <button type="button" class="remove" onclick=${() => this.#removeItem(item.id)}>Remove</button>
             </div>
           </li>
