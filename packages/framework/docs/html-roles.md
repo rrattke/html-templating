@@ -4,34 +4,71 @@ This document focuses only on the types and helpers declared in `src/template/ht
 
 ## Surface API
 
-- **`html(strings, ...values): TemplateResult`** — Tagged template entry point that packages the static `strings` array and the dynamic `values` into a `TemplateResult` instance.
-- **`TemplateResult` / `TemplateResultImpl`** — Immutable pairing of `strings` (static chunks), `values` (dynamic expressions), and an optional `key` used for keyed list reconciliation. The `setKey()` helper mutates the instance to attach a stable identity.
-- **`TemplateRecord`** — Parsed, cached representation of a template: the compiled `HTMLTemplateElement`, its `descriptors` (dynamic hole locations), and a cheap `clone()` method that returns a fresh `DocumentFragment` copy.
-- **`getTemplateRecord(strings)`** — Retrieves or creates a `TemplateRecord` keyed by the unique `TemplateStringsArray` identity, guaranteeing parsing happens only once per template definition.
+- **`createTemplateDescriptor(strings): TemplateDescriptor`** — Parses template strings into a compiled `HTMLTemplateElement` plus `descriptors` array mapping each expression to its DOM location.
+- **`resolvePath(root, path): Node`** — Replays a stored path against a cloned fragment to find the node a descriptor points to.
+
+## Part Descriptors
+
+```typescript
+type PartDescriptor = 
+  | NodePartDescriptor        // Expression in node position: ${expr}
+  | AttributePartDescriptor   // Single expression as attribute value
+  | TextContentPartDescriptor // Expression inside <style> or <script>
+  | TextTemplatePartDescriptor; // Multiple expressions in attribute or textContent
+```
+
+- **`NodePartDescriptor`** — `{ type: 'node', path }` — Comment marker in content flow
+- **`AttributePartDescriptor`** — `{ type: 'attribute', name, path }` — Single expression replacing entire attribute value
+- **`TextContentPartDescriptor`** — `{ type: 'textContent', path }` — Single expression as textContent (for `<style>`, `<script>`)
+- **`TextTemplatePartDescriptor`** — `{ type: 'textTemplate', target, name?, path, strings, indices }` — Multiple expressions with static text between them
 
 ## Marker Construction
 
-- **`buildHTML(strings)`** — Concatenates static chunks while inserting synthetic markers where expressions appear.
-  - Node position → comment marker: `<!--part:N-->`
-  - Attribute position → quoted marker: `"%%PART:N%%"`
-- **`isAttributePosition(chunk)`** — Heuristic that detects whether the current expression sits in an attribute value context (looks for trailing `=` before the hole).
-- **`nodeMarkerForIndex` / `attributeMarkerForIndex`** — Generate the marker strings for node and attribute expressions.
+- **`createHtmlTemplate(strings)`** — Builds the HTML string by:
+  1. Tracking context with `HTMLContextTracker`
+  2. Inserting node markers: `<!--part:N-->`
+  3. Inserting attribute markers: `%%PART:N%%` (with quotes if needed)
+  
+- **`HTMLContextTracker`** — State machine that tracks parser position:
+  - Modes: `TEXT`, `TAG`, `COMMENT`, `ATTR_VALUE_DOUBLE`, `ATTR_VALUE_SINGLE`, `ATTR_VALUE_UNQUOTED`
+  - `advance(chunk)` — Processes a static chunk, updating mode
+  - `inAttributeValue()` — Returns true if next expression is in attribute context
+  - `getMode()` — Returns current parser mode (used to decide if quotes needed)
+
+- **`createNodeMarker(index)`** — Generates `<!--part:N-->`
+- **`createAttributeMarker(index)`** — Generates `%%PART:N%%`
+- **`needsQuotes(mode)`** — Returns true for unquoted attribute values
 
 ## Parsing and Descriptor Extraction
 
-- **`createTemplateRecord(strings)`** — Core parser pipeline: create `<template>`, set `innerHTML` to the marker-filled string, allocate descriptor slots, and call `scanTemplateContent()` to populate them.
-- **`scanTemplateContent(fragment, descriptors)`** — Walks the template content with `TreeWalker`, detecting markers in two passes:
-  - **Node markers** — `extractNodePart()` records a `NodePartDescriptor { type: 'node', path }` when encountering a matching comment.
-  - **Attribute markers** — `extractAttributeParts()` records an `AttributePartDescriptor { type: 'attribute', name, path }` for attributes whose values exactly match the marker pattern.
-- **`buildPath(node, root)`** — Encodes a node’s location as an array of child indices from the fragment root; stored in descriptors so clones can be resolved quickly.
-- **`resolvePath(root, path)`** — Replays the stored indices against a cloned fragment to find the node or element that a descriptor points to.
+- **`scanTemplateContent(fragment, descriptors)`** — Walks the compiled template with `TreeWalker`, detecting markers:
+  - **Comments** → `extractNodePart()` records `NodePartDescriptor`
+  - **`<style>` / `<script>` elements** → `extractTextContentPart()` handles expressions in textContent
+  - **Element attributes** → `extractAttributeParts()` handles attribute expressions
+
+- **`extractNodePart(comment, root, descriptors)`** — Parses comment marker, records `NodePartDescriptor` with path
+
+- **`extractTextContentPart(element, root, descriptors)`** — Handles expressions inside `<style>` or `<script>`:
+  - Single expression → `TextContentPartDescriptor`
+  - Multiple expressions → `TextTemplatePartDescriptor` with `strings` and `indices`
+
+- **`extractAttributeParts(element, root, descriptors)`** — Handles attribute expressions:
+  - Single expression (whole value) → `AttributePartDescriptor`
+  - Multiple expressions or mixed → `TextTemplatePartDescriptor`
+
+- **`buildPath(node, root)`** — Encodes a node's location as array of child indices from fragment root
+- **`resolvePath(root, path)`** — Replays indices against cloned fragment to find target node
 
 ## Caching Strategy
 
-- **`templateCache: WeakMap<TemplateStringsArray, TemplateRecord>`** — Relies on the JS guarantee that each tagged template literal shares the same `TemplateStringsArray` object identity. Templates are parsed once and reused; the GC can collect cache entries when the originating module becomes unreachable.
+Template caching is handled in `instantiate.ts`:
+
+- **`templateCache: WeakMap<TemplateStringsArray, Template>`** — Relies on the JS guarantee that each tagged template literal shares the same `TemplateStringsArray` object identity. Templates are parsed once and reused; the GC can collect cache entries when the originating module becomes unreachable.
 
 ## Why this separation exists
 
-- Authoring uses only `html` and receives a `TemplateResult`.
-- Instantiation (in `instantiate.ts`) consumes the `TemplateRecord` plus descriptor paths to create concrete `NodePart` / `AttributePart` instances.
-- Marker generation and descriptor extraction remain co-located in `html.ts`, so the parsing rules are centralized and isolated from rendering concerns.
+- **`html.ts`** — Template parsing: markers, descriptors, paths. No knowledge of bindings or values.
+- **`instantiate.ts`** — Template instantiation: `Template`, `TemplateBinding`, caching, part creation.
+- **`parts.ts`** — Part implementations: `NodePart`, `AttributePart`, etc. Value application only.
+
+This separation keeps parsing rules isolated from rendering concerns.
