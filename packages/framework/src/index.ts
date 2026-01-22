@@ -1,4 +1,4 @@
-export { type TemplateBinding, type TemplateInstance } from './template/instantiate.js';
+export { type TemplateBinding, type TemplateInstance } from './template/render.js';
 export { PartsTemplate } from './template/parts.js';
 export { createSignal, createEffect, createMemo, batch, untrack, onCleanup } from './reactive/signal.js';
 export type { Signal, Memo } from './reactive/signal.js';

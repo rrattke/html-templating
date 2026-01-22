@@ -185,7 +185,7 @@ export class InstanceState {
     const end = this.range.end;
 
     while (node) {
-      const next = node.nextSibling;
+      const next: Node | null = node.nextSibling;
       parent.insertBefore(node, referenceNode);
       if (node === end) break;
       node = next;
@@ -293,7 +293,7 @@ export class Reconciler {
     const end = state.range.end;
 
     while (node) {
-      const next = node.nextSibling;
+      const next: Node | null = node.nextSibling;
       this.#parent.insertBefore(node, referenceNode);
       if (node === end) break;
       node = next;
