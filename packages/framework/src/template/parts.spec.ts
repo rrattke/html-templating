@@ -326,7 +326,13 @@ describe('TemplateAttributePart', () => {
   });
 });
 
-describe('NodePart - Keyed Templates', () => {
+/**
+ * Tests for NodePart with template bindings.
+ * 
+ * NOTE: NodePart is now stateless - it just applies values to the DOM.
+ * For keyed reconciliation (reusing instances by key), use Reconciler from render.ts.
+ */
+describe('NodePart - Template Bindings', () => {
   let container: HTMLElement;
   let marker: Comment;
   let part: NodePart;
@@ -334,7 +340,6 @@ describe('NodePart - Keyed Templates', () => {
   // Mock TemplateBinding for testing
   function createMockBinding(key: unknown, content: string): any {
     let instanceCallCount = 0;
-    let disposeCallCount = 0;
     
     const binding = {
       key,
@@ -345,12 +350,11 @@ describe('NodePart - Keyed Templates', () => {
         fragment.appendChild(text);
         return {
           fragment,
-          dispose: () => { disposeCallCount++; }
+          dispose: () => {}
         };
       },
       strings: ['mock'],
       values: [content],
-      _disposeCallCount: () => disposeCallCount,
       _instanceCallCount: () => instanceCallCount
     };
     return binding;
@@ -363,15 +367,16 @@ describe('NodePart - Keyed Templates', () => {
     part = new NodePart(marker);
   });
 
-  describe('single keyed template', () => {
-    it('should create instance for new keyed template', () => {
+  describe('single template binding', () => {
+    it('should render template binding', () => {
       const binding = createMockBinding('key1', 'Hello');
       part.setValue(binding);
       
       expect(container.textContent).toBe('Hello');
+      expect(binding._instanceCallCount()).toBe(1);
     });
 
-    it('should reuse instance when same key appears again', () => {
+    it('should replace content on each setValue (no keyed reuse)', () => {
       const binding1 = createMockBinding('key1', 'First');
       part.setValue(binding1);
       expect(container.textContent).toBe('First');
@@ -379,43 +384,21 @@ describe('NodePart - Keyed Templates', () => {
       const binding2 = createMockBinding('key1', 'Second');
       part.setValue(binding2);
       
-      // Should still show 'First' because instance was reused
-      expect(container.textContent).toBe('First');
-      // First binding's dispose should not be called
-      expect(binding1._disposeCallCount()).toBe(0);
-    });
-
-    it('should create new instance when key changes', () => {
-      const binding1 = createMockBinding('key1', 'First');
-      part.setValue(binding1);
-      expect(container.textContent).toBe('First');
-      
-      const binding2 = createMockBinding('key2', 'Second');
-      part.setValue(binding2);
-      
-      // Should show 'Second' because different key
+      // NodePart is stateless - always instantiates new binding
       expect(container.textContent).toBe('Second');
-      // First binding should be disposed
-      expect(binding1._disposeCallCount()).toBe(1);
+      expect(binding2._instanceCallCount()).toBe(1);
     });
 
-    it('should handle non-keyed template after keyed template', () => {
-      const keyedBinding = createMockBinding('key1', 'Keyed');
-      part.setValue(keyedBinding);
-      expect(container.textContent).toBe('Keyed');
+    it('should render template binding without key', () => {
+      const binding = createMockBinding(undefined, 'NoKey');
+      part.setValue(binding);
       
-      const nonKeyedBinding = createMockBinding(undefined, 'NonKeyed');
-      part.setValue(nonKeyedBinding);
-      
-      // Should clear keyed state and show new content
-      expect(container.textContent).toBe('NonKeyed');
-      // Keyed binding should be disposed
-      expect(keyedBinding._disposeCallCount()).toBe(1);
+      expect(container.textContent).toBe('NoKey');
     });
   });
 
-  describe('array of keyed templates', () => {
-    it('should create instances for all keyed templates', () => {
+  describe('array of template bindings', () => {
+    it('should render array of template bindings', () => {
       const bindings = [
         createMockBinding('a', 'A'),
         createMockBinding('b', 'B'),
@@ -426,7 +409,7 @@ describe('NodePart - Keyed Templates', () => {
       expect(container.textContent).toBe('ABC');
     });
 
-    it('should reuse instances when keys remain the same', () => {
+    it('should create new instances on each update (no keyed reuse)', () => {
       const bindings1 = [
         createMockBinding('a', 'A'),
         createMockBinding('b', 'B')
@@ -440,100 +423,13 @@ describe('NodePart - Keyed Templates', () => {
       ];
       part.setValue(bindings2);
       
-      // Should still show 'AB' because instances were reused
-      expect(container.textContent).toBe('AB');
-      expect(bindings1[0]._disposeCallCount()).toBe(0);
-      expect(bindings1[1]._disposeCallCount()).toBe(0);
-    });
-
-    it('should reorder elements when key order changes', () => {
-      const bindings1 = [
-        createMockBinding('a', 'A'),
-        createMockBinding('b', 'B'),
-        createMockBinding('c', 'C')
-      ];
-      part.setValue(bindings1);
-      expect(container.textContent).toBe('ABC');
-      
-      const bindings2 = [
-        createMockBinding('c', 'C'),
-        createMockBinding('a', 'A'),
-        createMockBinding('b', 'B')
-      ];
-      part.setValue(bindings2);
-      
-      // Should reorder to 'CAB'
-      expect(container.textContent).toBe('CAB');
-      // No disposals should happen
-      expect(bindings1[0]._disposeCallCount()).toBe(0);
-      expect(bindings1[1]._disposeCallCount()).toBe(0);
-      expect(bindings1[2]._disposeCallCount()).toBe(0);
-    });
-
-    it('should add new keyed items', () => {
-      const bindings1 = [
-        createMockBinding('a', 'A'),
-        createMockBinding('b', 'B')
-      ];
-      part.setValue(bindings1);
-      expect(container.textContent).toBe('AB');
-      
-      const bindings2 = [
-        createMockBinding('a', 'A'),
-        createMockBinding('b', 'B'),
-        createMockBinding('c', 'C')
-      ];
-      part.setValue(bindings2);
-      
-      expect(container.textContent).toBe('ABC');
-      expect(bindings1[0]._disposeCallCount()).toBe(0);
-      expect(bindings1[1]._disposeCallCount()).toBe(0);
-    });
-
-    it('should remove keyed items that are no longer present', () => {
-      const bindings1 = [
-        createMockBinding('a', 'A'),
-        createMockBinding('b', 'B'),
-        createMockBinding('c', 'C')
-      ];
-      part.setValue(bindings1);
-      expect(container.textContent).toBe('ABC');
-      
-      const bindings2 = [
-        createMockBinding('a', 'A'),
-        createMockBinding('c', 'C')
-      ];
-      part.setValue(bindings2);
-      
-      expect(container.textContent).toBe('AC');
-      // 'b' should be disposed
-      expect(bindings1[1]._disposeCallCount()).toBe(1);
-      // 'a' and 'c' should not be disposed
-      expect(bindings1[0]._disposeCallCount()).toBe(0);
-      expect(bindings1[2]._disposeCallCount()).toBe(0);
-    });
-
-    it('should handle complete replacement of keyed items', () => {
-      const bindings1 = [
-        createMockBinding('a', 'A'),
-        createMockBinding('b', 'B')
-      ];
-      part.setValue(bindings1);
-      expect(container.textContent).toBe('AB');
-      
-      const bindings2 = [
-        createMockBinding('x', 'X'),
-        createMockBinding('y', 'Y')
-      ];
-      part.setValue(bindings2);
-      
+      // NodePart is stateless - always instantiates new bindings
       expect(container.textContent).toBe('XY');
-      // Old items should be disposed
-      expect(bindings1[0]._disposeCallCount()).toBe(1);
-      expect(bindings1[1]._disposeCallCount()).toBe(1);
+      expect(bindings2[0]._instanceCallCount()).toBe(1);
+      expect(bindings2[1]._instanceCallCount()).toBe(1);
     });
 
-    it('should handle empty array after keyed items', () => {
+    it('should handle empty array', () => {
       const bindings = [
         createMockBinding('a', 'A'),
         createMockBinding('b', 'B')
@@ -544,209 +440,37 @@ describe('NodePart - Keyed Templates', () => {
       part.setValue([]);
       
       expect(container.textContent).toBe('');
-      // All items should be disposed
-      expect(bindings[0]._disposeCallCount()).toBe(1);
-      expect(bindings[1]._disposeCallCount()).toBe(1);
-    });
-  });
-
-  describe('mixed keyed and non-keyed', () => {
-    it('should clear keyed state when switching to non-keyed array', () => {
-      const keyedBindings = [
-        createMockBinding('a', 'A'),
-        createMockBinding('b', 'B')
-      ];
-      part.setValue(keyedBindings);
-      expect(container.textContent).toBe('AB');
-      
-      const nonKeyedBindings = [
-        createMockBinding(undefined, 'X'),
-        createMockBinding(undefined, 'Y')
-      ];
-      part.setValue(nonKeyedBindings);
-      
-      expect(container.textContent).toBe('XY');
-      // Keyed items should be disposed
-      expect(keyedBindings[0]._disposeCallCount()).toBe(1);
-      expect(keyedBindings[1]._disposeCallCount()).toBe(1);
     });
 
-    it('should clear non-keyed state when switching to keyed array', () => {
-      const nonKeyedBindings = [
-        createMockBinding(undefined, 'X'),
-        createMockBinding(undefined, 'Y')
-      ];
-      part.setValue(nonKeyedBindings);
-      expect(container.textContent).toBe('XY');
-      
-      const keyedBindings = [
-        createMockBinding('a', 'A'),
-        createMockBinding('b', 'B')
-      ];
-      part.setValue(keyedBindings);
-      
-      expect(container.textContent).toBe('AB');
-      // Non-keyed items should be disposed
-      expect(nonKeyedBindings[0]._disposeCallCount()).toBe(1);
-      expect(nonKeyedBindings[1]._disposeCallCount()).toBe(1);
-    });
-  });
-
-  describe('edge cases', () => {
-    it('should handle null/false to clear keyed templates', () => {
+    it('should handle nested arrays', () => {
       const bindings = [
         createMockBinding('a', 'A'),
-        createMockBinding('b', 'B')
+        [createMockBinding('b', 'B'), createMockBinding('c', 'C')],
+        createMockBinding('d', 'D')
       ];
       part.setValue(bindings);
-      expect(container.textContent).toBe('AB');
+      
+      expect(container.textContent).toBe('ABCD');
+    });
+  });
+
+  describe('clearing content', () => {
+    it('should clear on null', () => {
+      part.setValue(createMockBinding('a', 'Hello'));
+      expect(container.textContent).toBe('Hello');
       
       part.setValue(null);
       
       expect(container.textContent).toBe('');
-      expect(bindings[0]._disposeCallCount()).toBe(1);
-      expect(bindings[1]._disposeCallCount()).toBe(1);
     });
 
-    it('should handle duplicate keys by using last occurrence', () => {
-      const bindings = [
-        createMockBinding('a', 'First'),
-        createMockBinding('a', 'Second')
-      ];
-      part.setValue(bindings);
+    it('should clear on false', () => {
+      part.setValue(createMockBinding('a', 'Hello'));
+      expect(container.textContent).toBe('Hello');
       
-      // The implementation processes in reverse order
-      // When iterating backwards, 'Second' creates the child first
-      // Then 'First' reuses it, so 'Second' is what we see
-      expect(container.textContent).toContain('Second');
-    });
-
-    it('should handle various key types', () => {
-      const bindings1 = [
-        createMockBinding(1, 'Number'),
-        createMockBinding('str', 'String'),
-        createMockBinding(true, 'Boolean')
-      ];
-      part.setValue(bindings1);
+      part.setValue(false);
       
-      expect(container.textContent).toBe('NumberStringBoolean');
-      
-      const bindings2 = [
-        createMockBinding(1, 'X'),
-        createMockBinding('str', 'Y'),
-        createMockBinding(true, 'Z')
-      ];
-      part.setValue(bindings2);
-      
-      // Should reuse based on keys
-      expect(container.textContent).toBe('NumberStringBoolean');
-    });
-
-    it('should insert re-added item at correct position, not old location', () => {
-      // Create initial list with 3 items: A, B, C
-      const bindings1 = [
-        createMockBinding('a', 'A'),
-        createMockBinding('b', 'B'),
-        createMockBinding('c', 'C')
-      ];
-      part.setValue(bindings1);
-      expect(container.textContent).toBe('ABC');
-      expect(bindings1[1]._instanceCallCount()).toBe(1); // B created once
-      
-      // Remove item B (list becomes A, C)
-      const bindings2 = [
-        createMockBinding('a', 'A'),
-        createMockBinding('c', 'C')
-      ];
-      part.setValue(bindings2);
-      expect(container.textContent).toBe('AC');
-      expect(bindings1[1]._disposeCallCount()).toBe(1); // B disposed
-      
-      // Re-add B at the end (list should become A, C, B)
-      const bindings3 = [
-        createMockBinding('a', 'A'),
-        createMockBinding('c', 'C'),
-        createMockBinding('b', 'B-new')
-      ];
-      part.setValue(bindings3);
-      
-      // B should appear at the end, not in its old position
-      expect(container.textContent).toBe('ACB-new');
-      // Verify that B's instance() was called again (creating new instance)
-      expect(bindings3[2]._instanceCallCount()).toBe(1);
-      
-      // Test another reordering: move B to the start (B, A, C)
-      const bindings4 = [
-        createMockBinding('b', 'B-start'),
-        createMockBinding('a', 'A'),
-        createMockBinding('c', 'C')
-      ];
-      part.setValue(bindings4);
-      
-      // B should be at the start
-      // Since it's still the same key 'b', it should reuse the instance from bindings3
-      expect(container.textContent).toBe('B-newAC');
-      // Instance should be reused (moved), not recreated
-      expect(bindings4[0]._instanceCallCount()).toBe(0); // Different binding object, not called
-    });
-
-    it('should handle remove and re-add of multiple items correctly', () => {
-      // Initial: A, B, C, D
-      const bindings1 = [
-        createMockBinding('a', 'A'),
-        createMockBinding('b', 'B'),
-        createMockBinding('c', 'C'),
-        createMockBinding('d', 'D')
-      ];
-      part.setValue(bindings1);
-      expect(container.textContent).toBe('ABCD');
-      
-      // Remove B and D: A, C
-      const bindings2 = [
-        createMockBinding('a', 'A'),
-        createMockBinding('c', 'C')
-      ];
-      part.setValue(bindings2);
-      expect(container.textContent).toBe('AC');
-      
-      // Re-add B at start and D in middle: B, A, D, C
-      const bindings3 = [
-        createMockBinding('b', 'B-new'),
-        createMockBinding('a', 'A'),
-        createMockBinding('d', 'D-new'),
-        createMockBinding('c', 'C')
-      ];
-      part.setValue(bindings3);
-      
-      // Items should appear in the new order
-      expect(container.textContent).toBe('B-newAD-newC');
-    });
-
-    it('should handle key collision - reuses existing item with same key', () => {
-      // This test documents the expected behavior when the same key appears again
-      // Scenario: Items ["Item1", "Item3"] exist, then trying to add another "Item3"
-      
-      const bindings1 = [
-        createMockBinding('item1', 'Content1'),
-        createMockBinding('item3', 'Content3-original')
-      ];
-      part.setValue(bindings1);
-      expect(container.textContent).toBe('Content1Content3-original');
-      
-      // Now add another binding with key 'item3' but different content
-      // The ListManager should REUSE the existing item3 instance
-      const bindings2 = [
-        createMockBinding('item1', 'Content1'),
-        createMockBinding('item3', 'Content3-new-attempt'),
-        createMockBinding('item2', 'Content2')
-      ];
-      part.setValue(bindings2);
-      
-      // The existing item3 DOM is reused, so it keeps the old content
-      // The new binding's instance() is never called
-      expect(container.textContent).toBe('Content1Content3-originalContent2');
-      // Verify the new binding for item3 was never instantiated
-      expect(bindings2[1]._instanceCallCount()).toBe(0);
+      expect(container.textContent).toBe('');
     });
   });
 });

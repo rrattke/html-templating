@@ -1,6 +1,10 @@
+import { buildPath, resolvePath } from './dom.js';
+
 const NODE_MARKER_PREFIX = 'part:';
 const ATTR_MARKER_PREFIX = '%%PART:';
 const ATTR_MARKER_SUFFIX = '%%';
+
+export { resolvePath };
 
 export type PartDescriptor = NodePartDescriptor | AttributePartDescriptor | TextContentPartDescriptor | TextTemplatePartDescriptor;
 
@@ -334,31 +338,4 @@ function extractAttributeParts(element: Element, root: DocumentFragment, descrip
       descriptors[idx] = descriptor;
     }
   }
-}
-
-function buildPath(node: Node, root: DocumentFragment): number[] {
-  const path: number[] = [];
-  let current: Node | null = node;
-  while (current && current !== root) {
-    const parent: ParentNode | null = current.parentNode;
-    if (!parent) {
-      break;
-    }
-    const index = Array.prototype.indexOf.call(parent.childNodes, current);
-    path.unshift(index);
-    current = parent;
-  }
-  return path;
-}
-
-export function resolvePath(root: DocumentFragment, path: number[]): Node {
-  let node: Node = root;
-  for (const index of path) {
-    const next = node.childNodes[index];
-    if (!next) {
-      throw new Error('Failed to resolve part path.');
-    }
-    node = next;
-  }
-  return node;
 }

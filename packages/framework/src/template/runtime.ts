@@ -3,7 +3,7 @@
  * Allows runtime to be configured globally by consuming applications.
  */
 
-import { TemplateBinding } from './instantiate.js';
+import { TemplateBinding } from './render.js';
 
 /**
  * HTML template tag function (delegates to configured runtime).

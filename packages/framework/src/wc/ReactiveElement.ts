@@ -1,4 +1,4 @@
-import type { TemplateBinding } from '../template/instantiate.js';
+import type { TemplateBinding } from '../template/render.js';
 
 export abstract class ReactiveElement extends HTMLElement {
   #dispose: (() => void) | null = null;

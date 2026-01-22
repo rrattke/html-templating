@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { TemplateBinding, getPartsTemplate } from './instantiate.js';
+import { TemplateBinding } from './render.js';
+import { getTemplate as getPartsTemplate } from './template.js';
 import { resolvePath } from './html.js';
 
 const dummyRuntime = { effect: (fn: () => void) => fn() } as any;
@@ -314,6 +315,61 @@ describe('html template function', () => {
       const fragment = document.createDocumentFragment();
       
       expect(() => resolvePath(fragment, [999])).toThrow('Failed to resolve part path');
+    });
+  });
+
+  describe('Descriptor Validation', () => {
+    it('should create attribute descriptor with correct name for @click', () => {
+      const strings = ['<button @click=', '>Click</button>'] as unknown as TemplateStringsArray;
+      const template = getPartsTemplate(strings);
+      
+      expect(template.descriptors).toHaveLength(1);
+      expect(template.descriptors[0].type).toBe('attribute');
+      if (template.descriptors[0].type === 'attribute') {
+        expect(template.descriptors[0].name).toBe('@click');
+      }
+    });
+
+    it('should create attribute descriptor with correct name for .value', () => {
+      const strings = ['<input .value=', '>'] as unknown as TemplateStringsArray;
+      const template = getPartsTemplate(strings);
+      
+      expect(template.descriptors).toHaveLength(1);
+      expect(template.descriptors[0].type).toBe('attribute');
+      if (template.descriptors[0].type === 'attribute') {
+        expect(template.descriptors[0].name).toBe('.value');
+      }
+    });
+
+    it('should create attribute descriptor with correct name for ?disabled', () => {
+      const strings = ['<button ?disabled=', '>Click</button>'] as unknown as TemplateStringsArray;
+      const template = getPartsTemplate(strings);
+      
+      expect(template.descriptors).toHaveLength(1);
+      expect(template.descriptors[0].type).toBe('attribute');
+      if (template.descriptors[0].type === 'attribute') {
+        expect(template.descriptors[0].name).toBe('?disabled');
+      }
+    });
+
+    it('should preserve prefixes in descriptor names', () => {
+      const strings = ['<button @click=', ' .disabled=', ' ?hidden=', '>Click</button>'] as unknown as TemplateStringsArray;
+      const template = getPartsTemplate(strings);
+      
+      expect(template.descriptors).toHaveLength(3);
+      expect(template.descriptors[0].type).toBe('attribute');
+      expect(template.descriptors[1].type).toBe('attribute');
+      expect(template.descriptors[2].type).toBe('attribute');
+      
+      if (template.descriptors[0].type === 'attribute') {
+        expect(template.descriptors[0].name).toBe('@click');
+      }
+      if (template.descriptors[1].type === 'attribute') {
+        expect(template.descriptors[1].name).toBe('.disabled');
+      }
+      if (template.descriptors[2].type === 'attribute') {
+        expect(template.descriptors[2].name).toBe('?hidden');
+      }
     });
   });
 });
