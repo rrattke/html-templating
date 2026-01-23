@@ -50,13 +50,13 @@ const card = html`
 
 ### Binding Syntax
 
-| Syntax | Part Type | Description |
-|--------|-----------|-------------|
-| `${expr}` | NodePart | Dynamic content in element body |
-| `attr=${expr}` | StandardAttributePart | Standard HTML attribute |
-| `.prop=${expr}` | PropertyAttributePart | Element property binding |
-| `?attr=${expr}` | BooleanAttributePart | Boolean attribute (add/remove) |
-| `@event=${fn}` | EventAttributePart | Event listener |
+| Syntax          | Part Type             | Description                     |
+| --------------- | --------------------- | ------------------------------- |
+| `${expr}`       | NodePart              | Dynamic content in element body |
+| `attr=${expr}`  | StandardAttributePart | Standard HTML attribute         |
+| `.prop=${expr}` | PropertyAttributePart | Element property binding        |
+| `?attr=${expr}` | BooleanAttributePart  | Boolean attribute (add/remove)  |
+| `@event=${fn}`  | EventAttributePart    | Event listener                  |
 
 ---
 
@@ -485,13 +485,13 @@ userName.set('Bob');
 
 The template system is organized into layers:
 
-| Module        | Layer | Responsibility |
-|---------------|-------|----------------|
-| `dom.ts`      | Shared | `NodeRange`, `buildPath()`, `resolvePath()` |
-| `html.ts`     | 1 | HTML parsing: markers, descriptors, context tracking |
-| `template.ts` | 1 | `Template` class: compile + cache + clone |
-| `parts.ts`    | 2 | Part implementations: stateless value application |
-| `render.ts`   | 3 | `TemplateBinding`, `TemplateInstance`, `Reconciler` |
+| Module        | Layer  | Responsibility                                       |
+| ------------- | ------ | ---------------------------------------------------- |
+| `dom.ts`      | Shared | `NodeRange`, `buildPath()`, `resolvePath()`          |
+| `html.ts`     | 1      | HTML parsing: markers, descriptors, context tracking |
+| `template.ts` | 1      | `Template` class: compile + cache + clone            |
+| `parts.ts`    | 2      | Part implementations: stateless value application    |
+| `render.ts`   | 3      | `TemplateBinding`, `TemplateInstance`, `Reconciler`  |
 
 ---
 

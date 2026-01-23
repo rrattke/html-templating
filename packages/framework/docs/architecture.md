@@ -41,7 +41,7 @@ reactive.ts (barrel export)
 
 The template module follows a three-layer architecture:
 
-```
+```text
 template.ts (barrel export)
     │
     ├─→ template/dom.ts             (DOM utilities: NodeRange, path helpers)
@@ -81,7 +81,7 @@ template.ts (barrel export)
 
 ### Web Components Module (`wc/`)
 
-```
+```text
 wc.ts (barrel export)
     ├─→ wc/ReactiveElement.ts       (base class)
     │       └─→ ../template/render.js (TemplateBinding)
