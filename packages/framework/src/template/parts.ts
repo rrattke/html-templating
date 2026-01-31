@@ -100,46 +100,10 @@ export class NodePart {
 
   setValue(value: unknown): void {
     this.#range.deleteContents();
-
-    // null/undefined/false → empty (enables conditional: condition && html`...`)
-    if (value == null || value === false) {
-      return;
+    const node = this.#valueToNode(value);
+    if (node) {
+      this.#range.insertNode(node);
     }
-
-    // Node → insert directly
-    if (value instanceof Node) {
-      this.#range.insertNode(value);
-      return;
-    }
-
-    // DocumentFragment → insert directly
-    if (value instanceof DocumentFragment) {
-      this.#range.insertNode(value);
-      return;
-    }
-
-    // TemplateBinding → instantiate and insert
-    if (isTemplateBinding(value)) {
-      const instance = value.instance();
-      this.#range.insertNode(instance.fragment);
-      return;
-    }
-
-    // Array/iterable → flatten and insert
-    if (isIterable(value)) {
-      const fragment = this.#range.ownerDocument.createDocumentFragment();
-      for (const item of value) {
-        const node = this.#valueToNode(item);
-        if (node) {
-          fragment.appendChild(node);
-        }
-      }
-      this.#range.insertNode(fragment);
-      return;
-    }
-
-    // Primitive → text node
-    this.#range.insertNode(this.#range.ownerDocument.createTextNode(String(value)));
   }
 
   #valueToNode(value: unknown): Node | null {
