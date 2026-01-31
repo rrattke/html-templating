@@ -186,8 +186,9 @@ function reconcileKeyedList(
       insertionPoint = instanceEnd;
     } else {
       // Reused and in same relative position
-      // Remove any orphaned nodes between insertionPoint and this item
-      NodeRange.deleteContents(insertionPoint, instanceStart);
+      // Remove any orphaned nodes between insertionPoint and this item's start
+      // instanceStart.previousSibling is the last orphaned node (or insertionPoint if no gap)
+      NodeRange.deleteContents(insertionPoint, instanceStart.previousSibling!);
       // Advance past this item
       insertionPoint = instanceEnd;
     }
@@ -336,23 +337,7 @@ export class TemplateInstance {
    * The range remains valid and will track the new location after reinsertion.
    */
   extractContent(): DocumentFragment {
-    const fragment = document.createDocumentFragment();
-    
-    const start = this.#range.start;
-    const end = this.#range.end;
-    
-    // For list items (no marker), extract from start to end inclusive
-    // For instances with markers, extract from marker to end inclusive
-    let node: Node | null = start;
-    
-    while (node) {
-      const next: Node | null = node.nextSibling;
-      fragment.appendChild(node);
-      if (node === end) break;
-      node = next;
-    }
-    
-    return fragment;
+    return NodeRange.extractInclusive(this.#range.start, this.#range.end);
   }
 
   /**
@@ -403,9 +388,10 @@ export class TemplateInstance {
     // List items skip marker creation to reduce DOM overhead
     let range: NodeRange;
     if (skipMarker) {
-      const firstChild = fragment.firstChild;
-      range = new NodeRange(firstChild ?? document.createComment(''), fragment.lastChild ?? firstChild ?? document.createComment(''));
+      // List items always have content from the template
+      range = new NodeRange(fragment.firstChild!, fragment.lastChild!);
     } else {
+      // Regular instances: marker as start, last child as end (or marker if empty)
       const startMarker = document.createComment('');
       fragment.insertBefore(startMarker, fragment.firstChild);
       range = new NodeRange(startMarker, fragment.lastChild ?? startMarker);
