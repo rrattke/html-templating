@@ -168,7 +168,18 @@ function reconcileKeyedList(
   // Track our insertion point as we reconcile
   let insertionPoint: Node = range.start;
   const parentNode = range.start.parentNode!;
-  const oldRangeEnd = range.end; // Capture old end before modifications
+  
+  // Track all nodes that belong to remaining items (for cleanup)
+  const retainedNodes = new Set<Node>();
+  for (const { instance } of entries) {
+    // Collect all nodes in this instance's range
+    let node: Node | null = instance.range.start;
+    while (node) {
+      retainedNodes.add(node);
+      if (node === instance.range.end) break;
+      node = node.nextSibling;
+    }
+  }
   
   for (const { instance, reused, key } of entries) {
     const instanceStart = instance.range.start;
@@ -185,21 +196,48 @@ function reconcileKeyedList(
       parentNode.insertBefore(fragment, insertionPoint.nextSibling);
       insertionPoint = instanceEnd;
     } else {
-      // Reused and in same relative position
-      // Remove any orphaned nodes between insertionPoint and this item's start
-      // instanceStart.previousSibling is the last orphaned node (or insertionPoint if no gap)
-      NodeRange.deleteContents(insertionPoint, instanceStart.previousSibling!);
-      // Advance past this item
-      insertionPoint = instanceEnd;
+      // Reused and in same relative position (LIS says it's stable)
+      // Check if it's actually adjacent to our insertion point
+      if (insertionPoint.nextSibling === instanceStart) {
+        // Already in position - just advance
+        insertionPoint = instanceEnd;
+      } else {
+        // Not adjacent - need to clean up gap and possibly move
+        // First, remove orphaned nodes between insertionPoint and this item
+        let node = insertionPoint.nextSibling;
+        while (node && node !== instanceStart) {
+          const next = node.nextSibling;
+          if (!retainedNodes.has(node)) {
+            node.remove();
+          }
+          node = next;
+        }
+        
+        // Now check if the item is adjacent (after removing orphans)
+        if (insertionPoint.nextSibling === instanceStart) {
+          insertionPoint = instanceEnd;
+        } else {
+          // Still not adjacent - must move
+          const fragment = instance.extractContent();
+          parentNode.insertBefore(fragment, insertionPoint.nextSibling);
+          insertionPoint = instanceEnd;
+        }
+      }
     }
   }
   
-  // Remove any remaining nodes after the last item up to old range end
-  // If insertionPoint === oldRangeEnd, this is a collapsed range (no-op)
-  NodeRange.deleteContents(insertionPoint, oldRangeEnd);
+  // Remove any remaining orphaned nodes after the last item
+  let node = insertionPoint.nextSibling;
+  while (node) {
+    const next = node.nextSibling;
+    if (!retainedNodes.has(node)) {
+      node.remove();
+    }
+    node = next;
+  }
   
   // Update range end to point to the last item
-  if (entries.length > 0) {1
+  if (entries.length > 0) {
     range.setEnd(entries[entries.length - 1].instance.range.end);
   } else {
     range.setEnd(range.start);
