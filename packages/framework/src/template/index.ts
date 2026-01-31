@@ -13,17 +13,18 @@ export {
   EventAttributePart, 
   TemplateAttributePart,
   TextContentPart,
-  TextTemplate 
+  TextTemplate,
+  type Part
 } from './parts.js';
 
 // Rendering - instance management (Layer 3)
 export { 
-  TemplateBinding, 
+  StaticBinding,
+  DynamicBinding,
   TemplateInstance, 
   InstanceState, 
-  Reconciler 
+  Reconciler
 } from './render.js';
-export type { Part } from './render.js';
 
 // Backward compatibility aliases
 export { Template as PartsTemplate, getTemplate as getPartsTemplate } from './template.js';

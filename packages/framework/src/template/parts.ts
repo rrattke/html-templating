@@ -1,6 +1,3 @@
-import type { TemplateBinding } from './render.js';
-import type { PartDescriptor } from './html.js';
-import type { SignalsRuntime } from '../runtime.js';
 import { NodeRange } from './dom.js';
 import { Template } from './template.js';
 

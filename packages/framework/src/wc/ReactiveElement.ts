@@ -1,4 +1,4 @@
-import type { TemplateBinding } from '../template/render.js';
+import type { DynamicBinding } from '../template/render.js';
 
 export abstract class ReactiveElement extends HTMLElement {
   #dispose: (() => void) | null = null;
@@ -7,7 +7,7 @@ export abstract class ReactiveElement extends HTMLElement {
     super();
   }
 
-  abstract template(): TemplateBinding;
+  abstract template(): DynamicBinding;
 
   connectedCallback(): void {
     this.render();

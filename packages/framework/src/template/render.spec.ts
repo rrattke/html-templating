@@ -4,8 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { Reconciler, TemplateBinding, InstanceState, TemplateInstance } from './render.js';
-import { getTemplate as getPartsTemplate } from './template.js';
+import { Reconciler, DynamicBinding, TemplateInstance } from './render.js';
 import { StandardAttributePart, PropertyAttributePart, BooleanAttributePart, EventAttributePart } from './parts.js';
 
 describe('Reconciler', () => {
@@ -21,7 +20,7 @@ describe('Reconciler', () => {
   } as any;
 
   // Create the html function for the mock runtime
-  const html = TemplateBinding.with(dummyRuntime);
+  const html = DynamicBinding.with(dummyRuntime);
 
   beforeEach(() => {
     container = document.createElement('div');
@@ -251,7 +250,7 @@ describe('Template to Part Translation', () => {
   } as any;
 
   // Create the html function for the mock runtime
-  const html = TemplateBinding.with(dummyRuntime);
+  const html = DynamicBinding.with(dummyRuntime);
 
   describe('Event Listeners (@prefix)', () => {
     it('should create EventAttributePart for @click', () => {
@@ -505,7 +504,7 @@ describe('Nested Templates', () => {
   } as any;
 
   // Create the html function for the mock runtime
-  const html = TemplateBinding.with(dummyRuntime);
+  const html = DynamicBinding.with(dummyRuntime);
 
   beforeEach(() => {
     container = document.createElement('div');
@@ -605,7 +604,7 @@ describe('Template Iteration', () => {
   } as any;
 
   // Create the html function for the mock runtime
-  const html = TemplateBinding.with(dummyRuntime);
+  const html = DynamicBinding.with(dummyRuntime);
 
   beforeEach(() => {
     container = document.createElement('div');
@@ -913,7 +912,7 @@ describe('Style Tag Rendering', () => {
     }
   } as any;
 
-  const html = TemplateBinding.with(dummyRuntime);
+  const html = DynamicBinding.with(dummyRuntime);
 
   beforeEach(() => {
     container = document.createElement('div');
@@ -998,7 +997,7 @@ describe('Keyed Templates', () => {
     }
   } as any;
 
-  const html = TemplateBinding.with(dummyRuntime);
+  const html = DynamicBinding.with(dummyRuntime);
 
   beforeEach(() => {
     container = document.createElement('div');
@@ -1047,7 +1046,7 @@ describe('Multi-Expression Text Templates', () => {
     }
   } as any;
 
-  const html = TemplateBinding.with(dummyRuntime);
+  const html = DynamicBinding.with(dummyRuntime);
 
   beforeEach(() => {
     container = document.createElement('div');
@@ -1093,7 +1092,7 @@ describe('Multi-Expression Text Templates', () => {
         return () => {};
       }
     } as any;
-    const reactiveHtml = TemplateBinding.with(reactiveRuntime);
+    const reactiveHtml = DynamicBinding.with(reactiveRuntime);
     const template = reactiveHtml`<div class="${() => class1} ${() => class2}"></div>`;
           
     const instance = template.instance();
@@ -1142,7 +1141,7 @@ describe('Boolean Attribute Binding', () => {
     }
   } as any;
 
-  const html = TemplateBinding.with(dummyRuntime);
+  const html = DynamicBinding.with(dummyRuntime);
 
   beforeEach(() => {
     container = document.createElement('div');
@@ -1211,5 +1210,120 @@ describe('Boolean Attribute Binding', () => {
     const button = container.querySelector('button');
     expect(button?.hasAttribute('disabled')).toBe(true);
     expect(button?.hasAttribute('hidden')).toBe(false);
+  });
+});
+
+describe('StaticBinding.render()', () => {
+  let container: HTMLElement;
+
+  // Create a minimal runtime for the html tag (values won't be reactive)
+  const staticRuntime = { 
+    effect: (fn: () => void) => { fn(); return () => {}; } 
+  } as any;
+
+  const html = DynamicBinding.with(staticRuntime);
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+  });
+
+  afterEach(() => {
+    container.remove();
+  });
+
+  it('should render a simple template', () => {
+    const template = html`<span>Hello</span>`;
+    const fragment = template.render();
+    container.appendChild(fragment);
+
+    expect(container.textContent).toBe('Hello');
+  });
+
+  it('should render with interpolated values', () => {
+    const name = 'World';
+    const template = html`<span>Hello ${name}!</span>`;
+    const fragment = template.render();
+    container.appendChild(fragment);
+
+    expect(container.textContent).toBe('Hello World!');
+  });
+
+  it('should render nested templates', () => {
+    const inner = html`<em>nested</em>`;
+    const outer = html`<div>This is ${inner} content</div>`;
+    const fragment = outer.render();
+    container.appendChild(fragment);
+
+    const em = container.querySelector('em');
+    expect(em?.textContent).toBe('nested');
+  });
+
+  it('should render arrays of templates', () => {
+    const items = ['A', 'B', 'C'];
+    const template = html`<ul>${items.map(item => html`<li>${item}</li>`)}</ul>`;
+    const fragment = template.render();
+    container.appendChild(fragment);
+
+    const lis = container.querySelectorAll('li');
+    expect(lis).toHaveLength(3);
+    expect(lis[0].textContent).toBe('A');
+    expect(lis[1].textContent).toBe('B');
+    expect(lis[2].textContent).toBe('C');
+  });
+
+  it('should render deeply nested templates', () => {
+    const level3 = html`<span>deep</span>`;
+    const level2 = html`<div>${level3}</div>`;
+    const level1 = html`<section>${level2}</section>`;
+    const fragment = level1.render();
+    container.appendChild(fragment);
+
+    const span = container.querySelector('section > div > span');
+    expect(span?.textContent).toBe('deep');
+  });
+
+  it('should handle nested arrays (flattening)', () => {
+    const items = [
+      html`<li>A</li>`,
+      [html`<li>B</li>`, html`<li>C</li>`],
+      html`<li>D</li>`
+    ];
+    const template = html`<ul>${items}</ul>`;
+    const fragment = template.render();
+    container.appendChild(fragment);
+
+    const lis = container.querySelectorAll('li');
+    expect(lis).toHaveLength(4);
+    expect(container.querySelector('ul')?.textContent).toBe('ABCD');
+  });
+
+  it('should handle null and false values', () => {
+    const showA = true;
+    const showB = false;
+    const template = html`<div>${showA && html`<span>A</span>`}${showB && html`<span>B</span>`}</div>`;
+    const fragment = template.render();
+    container.appendChild(fragment);
+
+    const spans = container.querySelectorAll('span');
+    expect(spans).toHaveLength(1);
+    expect(spans[0].textContent).toBe('A');
+  });
+
+  it('should render attributes', () => {
+    const cls = 'my-class';
+    const template = html`<div class="${cls}">Content</div>`;
+    const fragment = template.render();
+    container.appendChild(fragment);
+
+    const div = container.querySelector('div');
+    expect(div?.className).toBe('my-class');
+  });
+
+  it('should return a DocumentFragment directly', () => {
+    const template = html`<span>Test</span>`;
+    const result = template.render();
+
+    expect(result).toBeInstanceOf(DocumentFragment);
   });
 });

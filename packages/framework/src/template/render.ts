@@ -3,7 +3,7 @@
  * Layer 3: Manages template instances, bindings, and reconciliation.
  */
 
-import type { NodePartDescriptor, AttributePartDescriptor, TextContentPartDescriptor, TextTemplatePartDescriptor, Descriptor } from './html.js';
+import type { Descriptor } from './html.js';
 import { resolvePath } from './html.js';
 import { NodeRange } from './dom.js';
 import { Template, getTemplate } from './template.js';
@@ -24,15 +24,97 @@ import {
 import type { SignalsRuntime } from '../runtime.js';
 
 /**
- * Process a value by instantiating any TemplateBindings.
+ * Static template binding - holds template strings and values.
+ * No runtime needed. Rendered once with render() method.
+ * 
+ * @example
+ * ```ts
+ * const html = StaticBinding.html;
+ * const page = html`<div>${title}</div>`;
+ * document.body.appendChild(page.render());
+ * ```
+ */
+export class StaticBinding {
+  #strings: TemplateStringsArray;
+  #values: unknown[];
+
+  constructor(strings: TemplateStringsArray, values: unknown[]) {
+    this.#strings = strings;
+    this.#values = values;
+  }
+
+  get strings(): TemplateStringsArray {
+    return this.#strings;
+  }
+
+  get values(): unknown[] {
+    return this.#values;
+  }
+
+  getTemplate(): Template {
+    return getTemplate(this.#strings);
+  }
+
+  /**
+   * Renders the template to a DocumentFragment.
+   * One-time rendering with no reactive updates.
+   */
+  render(): DocumentFragment {
+    const template = this.getTemplate();
+    const fragment = template.cloneFragment();
+    const parts = createParts(template.descriptors, fragment);
+    
+    parts.forEach((part, index) => {
+      const value = this.#values[index];
+      const processed = processValueStatic(value);
+      part.setValue(processed);
+    });
+    
+    return fragment;
+  }
+
+  /**
+   * Creates an html`` tag function for static templates.
+   */
+  static html(strings: TemplateStringsArray, ...values: unknown[]): StaticBinding {
+    return new StaticBinding(strings, values);
+  }
+}
+
+/**
+ * Process a value for static rendering by instantiating any StaticBindings.
+ * Unlike processValue, this doesn't track instances for disposal.
+ */
+function processValueStatic(value: unknown): unknown {
+  // Handle StaticBinding by rendering it
+  if (isStaticBinding(value)) {
+    return value.render();
+  }
+  
+  // Handle arrays/iterables recursively
+  if (isIterable(value)) {
+    return Array.from(value).map(item => processValueStatic(item));
+  }
+  
+  // Pass through everything else (nodes, primitives, null, etc.)
+  return value;
+}
+
+/**
+ * Process a value by instantiating any DynamicBindings.
  * Nested instances are tracked for disposal.
  */
 function processValue(value: unknown, runtime: SignalsRuntime, nestedInstances: TemplateInstance[]): unknown {
-  // Handle TemplateBinding by instantiating it
-  if (isTemplateBinding(value)) {
+  // Handle DynamicBinding by instantiating it
+  if (isDynamicBinding(value)) {
     const instance = TemplateInstance.create(runtime, value.getTemplate(), value.values);
     nestedInstances.push(instance);
     return instance.fragment;
+  }
+  
+  // Handle StaticBinding by rendering it (allows mixing static in dynamic templates)
+  if (isStaticBinding(value)) {
+    return value.render();
   }
   
   // Handle arrays/iterables recursively
@@ -44,11 +126,18 @@ function processValue(value: unknown, runtime: SignalsRuntime, nestedInstances: 
   return value;
 }
 
-function isTemplateBinding(value: unknown): value is TemplateBinding {
+function isStaticBinding(value: unknown): value is StaticBinding {
   if (value == null || typeof value !== 'object') {
     return false;
   }
   return 'strings' in (value as Record<string, unknown>) && 'values' in (value as Record<string, unknown>);
+}
+
+function isDynamicBinding(value: unknown): value is DynamicBinding {
+  if (!isStaticBinding(value)) {
+    return false;
+  }
+  return 'runtime' in value;
 }
 
 function isIterable(value: unknown): value is Iterable<unknown> {
@@ -89,7 +178,7 @@ export class TemplateInstance {
     }
 
     const fragment = template.cloneFragment();
-    const parts = createParts(template.descriptors, fragment, runtime);
+    const parts = createParts(template.descriptors, fragment);
     const disposers: Array<() => void> = [];
     const nestedInstances: TemplateInstance[] = [];
 
@@ -128,18 +217,22 @@ export class TemplateInstance {
 }
 
 /**
- * Template binding that holds template strings, values, and runtime.
- * Used as the result of the html`` tagged template literal.
+ * Dynamic template binding - extends StaticBinding with runtime and key.
+ * Used for reactive templates that update when signals change.
+ * 
+ * @example
+ * ```ts
+ * const html = DynamicBinding.with(runtime);
+ * const page = html`<div>${() => count()}</div>`;
+ * document.body.appendChild(page.instance().fragment);
+ * ```
  */
-export class TemplateBinding {
-  #strings: TemplateStringsArray;
-  #values: unknown[];
+export class DynamicBinding extends StaticBinding {
   #runtime: SignalsRuntime;
   key?: unknown;
 
   constructor(strings: TemplateStringsArray, values: unknown[], runtime: SignalsRuntime) {
-    this.#strings = strings;
-    this.#values = values;
+    super(strings, values);
     this.#runtime = runtime;
   }
 
@@ -147,32 +240,24 @@ export class TemplateBinding {
    * Creates an html`` tag function bound to a specific runtime.
    * Supports both direct use (html`...`) and keyed use (html(key)`...`).
    */
-  static with(runtime: SignalsRuntime): ((strings: TemplateStringsArray, ...values: unknown[]) => TemplateBinding) & ((key?: unknown) => (strings: TemplateStringsArray, ...values: unknown[]) => TemplateBinding) {
+  static with(runtime: SignalsRuntime): ((strings: TemplateStringsArray, ...values: unknown[]) => DynamicBinding) & ((key?: unknown) => (strings: TemplateStringsArray, ...values: unknown[]) => DynamicBinding) {
     const htmlFunction = ((stringsOrKey?: TemplateStringsArray | unknown, ...values: unknown[]) => {
       // If called as a template tag: html``
       if (stringsOrKey && typeof stringsOrKey === 'object' && 'raw' in stringsOrKey) {
-        return new TemplateBinding(stringsOrKey as TemplateStringsArray, values, runtime);
+        return new DynamicBinding(stringsOrKey as TemplateStringsArray, values, runtime);
       }
       // If called as a function: html(key)
       const key = stringsOrKey;
       return (strings: TemplateStringsArray, ...values: unknown[]) => {
-        const binding = new TemplateBinding(strings, values, runtime);
+        const binding = new DynamicBinding(strings, values, runtime);
         if (key !== undefined) {
           binding.key = key;
         }
         return binding;
       };
-    }) as ((strings: TemplateStringsArray, ...values: unknown[]) => TemplateBinding) & ((key?: unknown) => (strings: TemplateStringsArray, ...values: unknown[]) => TemplateBinding);
+    }) as ((strings: TemplateStringsArray, ...values: unknown[]) => DynamicBinding) & ((key?: unknown) => (strings: TemplateStringsArray, ...values: unknown[]) => DynamicBinding);
 
     return htmlFunction;
-  }
-
-  get strings(): TemplateStringsArray {
-    return this.#strings;
-  }
-
-  get values(): unknown[] {
-    return this.#values;
   }
 
   get runtime(): SignalsRuntime {
@@ -185,11 +270,7 @@ export class TemplateBinding {
   }
 
   instance() {
-    return TemplateInstance.create(this.#runtime, this.getTemplate(), this.#values);
-  }
-
-  getTemplate(): Template {
-    return getTemplate(this.#strings);
+    return TemplateInstance.create(this.#runtime, this.getTemplate(), this.values);
   }
 }
 
@@ -267,7 +348,7 @@ export class Reconciler {
    * Renders a list of template bindings, reusing existing instances by key
    * and performing minimal DOM operations.
    */
-  render(bindings: TemplateBinding[]): void {
+  render(bindings: DynamicBinding[]): void {
     const reusedKeys = new Set<unknown>();
     const newStates: InstanceState[] = [];
 
@@ -312,7 +393,7 @@ export class Reconciler {
     }
   }
 
-  #createState(binding: TemplateBinding): InstanceState {
+  #createState(binding: DynamicBinding): InstanceState {
     const instance = binding.instance();
     const startMarker = document.createComment('');
 
@@ -353,7 +434,7 @@ export class Reconciler {
   }
 }
 
-function createParts(descriptors: Descriptor[], fragment: DocumentFragment, runtime: SignalsRuntime): Part[] {
+function createParts(descriptors: Descriptor[], fragment: DocumentFragment): Part[] {
   const textTemplateCache = new Map<Descriptor, TextTemplate>();
   
   return descriptors.map((descriptor, index) => {

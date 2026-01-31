@@ -3,7 +3,7 @@
  * Allows runtime to be configured globally by consuming applications.
  */
 
-import { TemplateBinding } from './render.js';
+import { DynamicBinding } from './render.js';
 
 /**
  * HTML template tag function (delegates to configured runtime).
@@ -13,5 +13,5 @@ export function html(...args: any[]): any {
   if (!runtime) {
     throw new Error('Runtime not configured. Call setRuntime() before importing components.');
   }
-  return TemplateBinding.with(runtime)(...args);
+  return DynamicBinding.with(runtime)(...args);
 }

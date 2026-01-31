@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { TemplateBinding } from './render.js';
+import { DynamicBinding } from './render.js';
 import { getTemplate as getPartsTemplate } from './template.js';
 import { resolvePath } from './html.js';
 
 const dummyRuntime = { effect: (fn: () => void) => fn() } as any;
-const html = TemplateBinding.with(dummyRuntime);
+const html = DynamicBinding.with(dummyRuntime);
 
 describe('html template function', () => {
   describe('template caching', () => {
