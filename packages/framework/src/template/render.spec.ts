@@ -846,6 +846,61 @@ describe('Template Iteration', () => {
     expect(lis[0].textContent).toBe('Apple');
     expect(lis[1].textContent).toBe('Cherry');
   });
+
+  it('should handle nested arrays (flatten arrays within arrays)', () => {
+    const templates = [
+      html`<span>A</span>`,
+      [html`<span>B</span>`, html`<span>C</span>`],
+      html`<span>D</span>`
+    ];
+    const template = html`<div>${templates}</div>`;
+    
+    const instance = template.instance();
+    container.appendChild(instance.fragment);
+    
+    const spans = container.querySelectorAll('span');
+    expect(spans).toHaveLength(4);
+    expect(spans[0].textContent).toBe('A');
+    expect(spans[1].textContent).toBe('B');
+    expect(spans[2].textContent).toBe('C');
+    expect(spans[3].textContent).toBe('D');
+  });
+
+  it('should clear template bindings with null', () => {
+    const inner = html`<span>Content</span>`;
+    const template = html`<div>${inner}</div>`;
+    
+    let instance = template.instance();
+    container.appendChild(instance.fragment);
+    expect(container.querySelector('span')?.textContent).toBe('Content');
+    
+    // Clear with null
+    const cleared = html`<div>${null}</div>`;
+    instance = cleared.instance();
+    container.innerHTML = '';
+    container.appendChild(instance.fragment);
+    
+    expect(container.querySelector('span')).toBeNull();
+    expect(container.querySelector('div')?.textContent).toBe('');
+  });
+
+  it('should clear template bindings with false', () => {
+    const inner = html`<span>Content</span>`;
+    const template = html`<div>${inner}</div>`;
+    
+    let instance = template.instance();
+    container.appendChild(instance.fragment);
+    expect(container.querySelector('span')?.textContent).toBe('Content');
+    
+    // Clear with false (enables conditional rendering)
+    const cleared = html`<div>${false}</div>`;
+    instance = cleared.instance();
+    container.innerHTML = '';
+    container.appendChild(instance.fragment);
+    
+    expect(container.querySelector('span')).toBeNull();
+    expect(container.querySelector('div')?.textContent).toBe('');
+  });
 });
 
 describe('Style Tag Rendering', () => {

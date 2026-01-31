@@ -116,9 +116,6 @@ export class NodePart {
     if (value instanceof DocumentFragment) {
       return value;
     }
-    if (isTemplateBinding(value)) {
-      return value.instance().fragment;
-    }
     if (isIterable(value)) {
       const fragment = this.#range.ownerDocument.createDocumentFragment();
       for (const item of value) {
@@ -283,11 +280,4 @@ function isIterable(value: unknown): value is Iterable<unknown> {
     return false;
   }
   return value != null && typeof (value as Iterable<unknown>)[Symbol.iterator] === 'function';
-}
-
-function isTemplateBinding(value: unknown): value is TemplateBinding {
-  if (value == null || typeof value !== 'object') {
-    return false;
-  }
-  return 'strings' in (value as Record<string, unknown>) && 'values' in (value as Record<string, unknown>);
 }

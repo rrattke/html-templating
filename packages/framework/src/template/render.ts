@@ -27,6 +27,41 @@ export type Part = NodePart | StandardAttributePart | PropertyAttributePart | Bo
 type Descriptor = NodePartDescriptor | AttributePartDescriptor | TextContentPartDescriptor | TextTemplatePartDescriptor;
 
 /**
+ * Process a value by instantiating any TemplateBindings.
+ * Nested instances are tracked for disposal.
+ */
+function processValue(value: unknown, runtime: SignalsRuntime, nestedInstances: TemplateInstance[]): unknown {
+  // Handle TemplateBinding by instantiating it
+  if (isTemplateBinding(value)) {
+    const instance = TemplateInstance.create(runtime, value.getTemplate(), value.values);
+    nestedInstances.push(instance);
+    return instance.fragment;
+  }
+  
+  // Handle arrays/iterables recursively
+  if (isIterable(value)) {
+    return Array.from(value).map(item => processValue(item, runtime, nestedInstances));
+  }
+  
+  // Pass through everything else (nodes, primitives, null, etc.)
+  return value;
+}
+
+function isTemplateBinding(value: unknown): value is TemplateBinding {
+  if (value == null || typeof value !== 'object') {
+    return false;
+  }
+  return 'strings' in (value as Record<string, unknown>) && 'values' in (value as Record<string, unknown>);
+}
+
+function isIterable(value: unknown): value is Iterable<unknown> {
+  if (typeof value === 'string') {
+    return false;
+  }
+  return value != null && typeof (value as Iterable<unknown>)[Symbol.iterator] === 'function';
+}
+
+/**
  * Realized template in the DOM.
  * Has behavior: dispose() cleans up effects and event listeners.
  */
@@ -59,6 +94,7 @@ export class TemplateInstance {
     const fragment = template.cloneFragment();
     const parts = createParts(template.descriptors, fragment, runtime);
     const disposers: Array<() => void> = [];
+    const nestedInstances: TemplateInstance[] = [];
 
     parts.forEach((part, index) => {
       const value = values[index];
@@ -69,16 +105,22 @@ export class TemplateInstance {
         }
         else {
           const dispose = runtime.effect(() => {
-            part.setValue(value());
+            const result = value();
+            const processed = processValue(result, runtime, nestedInstances);
+            part.setValue(processed);
           });
           disposers.push(dispose);
         }
       } else {
-        part.setValue(value);
+        const processed = processValue(value, runtime, nestedInstances);
+        part.setValue(processed);
       }
     });
 
     const dispose = () => {
+      for (const instance of nestedInstances) {
+        instance.dispose();
+      }
       for (const disposer of disposers) {
         disposer();
       }
