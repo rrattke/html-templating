@@ -88,7 +88,7 @@ No diffing. No template re-evaluation. No virtual DOM.
 ### 3.4 Runtime Adapters
 
 - The template layer depends on a `SignalsRuntime` interface with reactive primitives
-- `TemplateBinding.with(runtime)` creates a runtime-specific template function factory
+- `DynamicBinding.with(runtime)` creates a runtime-specific template function factory
 - `StateDecorator.with(runtime)` creates a runtime-specific state decorator
 - No global state—each binding carries its own runtime
 - Component authors import runtime-specific `html` and `state` from their runtime module
@@ -126,7 +126,7 @@ The framework uses a strict three-layer architecture that separates concerns cle
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  Layer 3: Instance Management (stateful)                                │
 │  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │  TemplateBinding + Reconciler                                     │  │
+│  │  DynamicBinding + Reconciler                                     │  │
 │  │  - Tracks instances by key                                        │  │
 │  │  - Decides: create new, reuse existing, or dispose                │  │
 │  │  - Manages DOM node ranges for moves                              │  │
@@ -168,7 +168,7 @@ class NodePart {
 class Reconciler {
   #instances: Map<unknown, InstanceState> = new Map();
   
-  reconcile(bindings: TemplateBinding[]): void {
+  reconcile(bindings: DynamicBinding[]): void {
     // Track by key, reuse or create instances
     // Call part.setValue() with the realized nodes
   }
@@ -183,7 +183,7 @@ class Reconciler {
 | -------------------- | ---------------------------------------------------------------------------------------------------------- |
 | **Template**         | Compiled template structure (cached by template strings). Created immediately in `html\`...\``. Immutable. |
 | **Part**             | Applies a value to a DOM location. Stateless. No knowledge of keys or reconciliation.                     |
-| **TemplateBinding**  | Render specification: Template reference + values array + optional key. Ephemeral, created on each render. |
+| **DynamicBinding**   | Render specification: Template reference + values array + optional key + runtime. Ephemeral, created on each render. |
 | **TemplateInstance** | Realized DOM: fragment + parts + dispose(). Has behavior. Created when binding is instantiated.           |
 | **InstanceState**    | Reconciliation bookkeeping: key + NodeRange + dispose. Managed by Reconciler.                             |
 | **Reconciler**       | Tracks InstanceState by key. Decides create/reuse/dispose. Orchestrates DOM moves.                        |
@@ -214,7 +214,7 @@ This breaks:
 
 **The problem is the fragment-based batch update, not key management.**
 
-The key is correctly stored on `TemplateBinding` (user intent) and should be copied to a tracked instance for reconciliation. The fix is changing *how* we update the DOM, not *where* we store keys.
+The key is correctly stored on `DynamicBinding` (user intent) and should be copied to a tracked instance for reconciliation. The fix is changing *how* we update the DOM, not *where* we store keys.
 
 ### Solution: In-Place DOM Moves
 
@@ -227,7 +227,7 @@ The `Reconciler` class handles keyed reconciliation by:
 
 ```typescript
 class Reconciler {
-  render(bindings: TemplateBinding[]): void {
+  render(bindings: DynamicBinding[]): void {
     // Process bindings, reuse by key, move in-place
     for (const binding of bindings) {
       if (this.#statesByKey.has(binding.key)) {

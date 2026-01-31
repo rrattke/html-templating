@@ -7,7 +7,7 @@ This document explains how the framework's template system works, from tagged te
 ## 1. High-Level Flow
 
 ```text
-(template literal) --> html() --> TemplateBinding
+(template literal) --> html() --> DynamicBinding
                           |
                           v
                    getTemplate()
@@ -42,7 +42,7 @@ const card = html`
 
 ### What `html` Produces
 
-- A `TemplateBinding` containing:
+- A `DynamicBinding` containing:
   - `strings`: the static literal chunks
   - `values`: the dynamic expressions
   - `runtime`: the reactive runtime to use for effects
@@ -229,7 +229,7 @@ Since template string arrays are interned by JavaScript engines, the same templa
 
 ### The `.instance()` Method
 
-`binding.instance()` creates a live DOM instance from a `TemplateBinding`:
+`binding.instance()` creates a live DOM instance from a `DynamicBinding`:
 
 1. Loads the cached `Template` for the `binding.strings`
 2. Clones the template's `DocumentFragment`
@@ -273,7 +273,7 @@ function resolvePath(root: DocumentFragment, path: number[]): Node {
 - Supports:
   - Text (`string` / `number`)
   - DOM nodes
-  - Nested `TemplateBinding` instances (recursively instantiated)
+  - Nested `DynamicBinding` instances (recursively instantiated)
   - Iterables (lists of primitives, nodes, or templates)
   - `null` / `false` (clears the part)
 
@@ -347,7 +347,7 @@ interface SignalsRuntime {
 Create runtime-specific template functions:
 
 ```ts
-export const html = TemplateBinding.with(myRuntime);
+export const html = DynamicBinding.with(myRuntime);
 ```
 
 Create runtime-specific state decorators:
@@ -356,7 +356,7 @@ Create runtime-specific state decorators:
 export const state = StateDecorator.with(myRuntime);
 ```
 
-Each `TemplateBinding` carries its runtime, so nested templates inherit it automatically.
+Each `DynamicBinding` carries its runtime, so nested templates inherit it automatically.
 
 ### Reactive Lifecycles
 
@@ -371,7 +371,7 @@ The runtime decides when to re-run `part.setValue`, ensuring updates target only
 
 ## 9. Nested Templates & Lists
 
-Because `NodePart` understands `TemplateBinding` values and generic iterables, you can compose declarative lists:
+Because `NodePart` understands `DynamicBinding` values and generic iterables, you can compose declarative lists:
 
 ```ts
 html`
@@ -485,13 +485,12 @@ userName.set('Bob');
 
 The template system is organized into layers:
 
-| Module        | Layer  | Responsibility                                       |
-| ------------- | ------ | ---------------------------------------------------- |
-| `dom.ts`      | Shared | `NodeRange`, `buildPath()`, `resolvePath()`          |
-| `html.ts`     | 1      | HTML parsing: markers, descriptors, context tracking |
-| `template.ts` | 1      | `Template` class: compile + cache + clone            |
-| `parts.ts`    | 2      | Part implementations: stateless value application    |
-| `render.ts`   | 3      | `TemplateBinding`, `TemplateInstance`, `Reconciler`  |
+| Module        | Layer | Responsibility                                                     |
+| ------------- | ----- | ------------------------------------------------------------------ |
+| `dom.ts`      | 0     | `NodeRange`, `buildPath()`, `resolvePath()`                        |
+| `template.ts` | 1     | HTML parsing, `Template` class, compile + cache + clone            |
+| `parts.ts`    | 2     | Part implementations + `createParts()` factory                     |
+| `render.ts`   | 3     | `StaticBinding`, `DynamicBinding`, `TemplateInstance`, `Reconciler`|
 
 ---
 

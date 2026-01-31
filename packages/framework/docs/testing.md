@@ -63,8 +63,8 @@ src/
     parts.ts              # Implementation
     parts.test.ts         # Test utilities
     parts.spec.ts         # Test suite
-    html.ts               # Implementation
-    html.spec.ts          # Test suite
+    template.ts           # Template parsing + class
+    template.spec.ts      # Test suite
 ```
 
 ### Shared Test Utilities

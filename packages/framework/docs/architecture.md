@@ -44,22 +44,17 @@ The template module follows a three-layer architecture:
 ```text
 template.ts (barrel export)
     │
-    ├─→ template/dom.ts             (DOM utilities: NodeRange, path helpers)
+    ├─→ template/dom.ts             (Layer 0: DOM utilities: NodeRange, path helpers)
     │
-    ├─→ template/html.ts            (Layer 1: HTML parsing, markers, descriptors)
+    ├─→ template/template.ts        (Layer 1: Template class + parsing + caching)
     │       └─→ dom.js
     │
-    ├─→ template/template.ts        (Layer 1: Template class + caching)
-    │       └─→ html.js
-    │
-    ├─→ template/parts.ts           (Layer 2: Part implementations)
+    ├─→ template/parts.ts           (Layer 2: Part implementations + createParts)
     │       ├─→ dom.js
-    │       ├─→ template.js
-    │       └─→ render.js           (TemplateBinding type)
+    │       └─→ template.js
     │
     ├─→ template/render.ts          (Layer 3: Instance management + reconciliation)
     │       ├─→ dom.js
-    │       ├─→ html.js
     │       ├─→ template.js
     │       ├─→ parts.js
     │       └─→ ../runtime.js
@@ -71,10 +66,9 @@ template.ts (barrel export)
 **Dependencies:**
 
 - `dom.ts`: No dependencies (leaf)
-- `html.ts`: ← `dom.ts`
-- `template.ts`: ← `html.ts`
-- `parts.ts`: ← `dom.ts`, `template.ts`, `render.ts` (type only)
-- `render.ts`: ← `dom.ts`, `html.ts`, `template.ts`, `parts.ts`, `runtime.ts`
+- `template.ts`: ← `dom.ts`
+- `parts.ts`: ← `dom.ts`, `template.ts`
+- `render.ts`: ← `dom.ts`, `template.ts`, `parts.ts`, `runtime.ts`
 - `runtime.ts`: ← `render.ts`
 
 ---
@@ -84,7 +78,7 @@ template.ts (barrel export)
 ```text
 wc.ts (barrel export)
     ├─→ wc/ReactiveElement.ts       (base class)
-    │       └─→ ../template/render.js (TemplateBinding)
+    │       └─→ ../template/render.js (DynamicBinding)
     ├─→ wc/decorators.ts            (@state, @attr)
     │       ├─→ ../reactive/runtime.js
     │       └─→ ../reactive/signal.js
@@ -137,11 +131,6 @@ index.ts (main entry - re-exports from all modules)
             │                  │                   │
    ┌────────▼─────────┐        │                   │
    │  template/       │        │                   │
-   │  html.ts         │        │                   │
-   └────────┬─────────┘        │                   │
-            │                  │                   │
-   ┌────────▼─────────┐        │                   │
-   │  template/       │        │                   │
    │  template.ts     │        │                   │
    └────────┬─────────┘        │                   │
             │                  │                   │
@@ -184,13 +173,12 @@ index.ts (main entry - re-exports from all modules)
 
 The template module is organized into three conceptual layers:
 
-| Layer  | Module        | Responsibility                                             |
-| ------ | ------------- | ---------------------------------------------------------- |
-| Shared | `dom.ts`      | DOM utilities: `NodeRange`, `buildPath()`, `resolvePath()` |
-| 1      | `html.ts`     | HTML parsing: markers, descriptors, `HTMLContextTracker`   |
-| 1      | `template.ts` | `Template` class: compile + cache + clone                  |
-| 2      | `parts.ts`    | Part implementations: stateless value application          |
-| 3      | `render.ts`   | `TemplateBinding`, `TemplateInstance`, `Reconciler`        |
+| Layer | Module        | Responsibility                                               |
+| ----- | ------------- | ------------------------------------------------------------ |
+| 0     | `dom.ts`      | DOM utilities: `NodeRange`, `buildPath()`, `resolvePath()`   |
+| 1     | `template.ts` | HTML parsing, `Template` class, compile + cache + clone      |
+| 2     | `parts.ts`    | Part implementations + `createParts()` factory               |
+| 3     | `render.ts`   | `StaticBinding`, `DynamicBinding`, `TemplateInstance`, `Reconciler` |
 
 ---
 
@@ -204,20 +192,16 @@ The template module is organized into three conceptual layers:
 **Layer 1:**
 
 - `reactive/runtime.ts` (depends on signal.ts)
-- `template/html.ts` (depends on dom.ts)
+- `template/template.ts` (depends on dom.ts)
 
 **Layer 2:**
 
-- `template/template.ts` (depends on html.ts)
+- `template/parts.ts` (depends on dom.ts, template.ts)
 - `wc/decorators.ts` (depends on reactive/runtime.ts, reactive/signal.ts)
 
 **Layer 3:**
 
-- `template/parts.ts` (depends on dom.ts, template.ts)
-
-**Layer 4:**
-
-- `template/render.ts` (depends on dom.ts, html.ts, template.ts, parts.ts, runtime.ts)
+- `template/render.ts` (depends on dom.ts, template.ts, parts.ts, runtime.ts)
 
 **Layer 5:**
 
@@ -248,7 +232,7 @@ template ───────> wc
 
 - `template` depends on `reactive` (for SignalsRuntime)
 - `wc` depends on `reactive` (for SignalsRuntime, Signal types)
-- `wc` depends on `template` (for TemplateBinding)
+- `wc` depends on `template` (for DynamicBinding)
 - No circular dependencies ✓
 
 ---
@@ -268,10 +252,9 @@ lib/
 │   └── runtime.js              (runtime interface + global)
 ├── template/
 │   ├── dom.js                  (DOM utilities)
-│   ├── html.js                 (HTML parser)
-│   ├── template.js             (Template class)
-│   ├── parts.js                (Part implementations)
-│   ├── render.js               (TemplateBinding, TemplateInstance, Reconciler)
+│   ├── template.js             (Template class + HTML parsing)
+│   ├── parts.js                (Part implementations + createParts)
+│   ├── render.js               (StaticBinding, DynamicBinding, TemplateInstance, Reconciler)
 │   └── runtime.js              (html facade)
 └── wc/
     ├── ReactiveElement.js      (base element)

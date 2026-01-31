@@ -3,22 +3,11 @@
  * Layer 3: Manages template instances, bindings, and reconciliation.
  */
 
-import type { Descriptor } from './html.js';
-import { resolvePath } from './html.js';
 import { NodeRange } from './dom.js';
 import { Template, getTemplate } from './template.js';
 import { 
-  StandardAttributePart, 
-  PropertyAttributePart, 
-  BooleanAttributePart, 
   EventAttributePart, 
-  TemplateAttributePart, 
-  NodePart, 
-  TextContentPart, 
-  TextTemplate, 
-  ATTRIBUTE_BINDING, 
-  PROPERTY_BINDING, 
-  BOOLEAN_ATTRIBUTE_BINDING,
+  createParts,
   type Part
 } from './parts.js';
 import type { SignalsRuntime } from '../runtime.js';
@@ -432,94 +421,4 @@ export class Reconciler {
     this.#statesByKey.clear();
     this.#endMarker.remove();
   }
-}
-
-function createParts(descriptors: Descriptor[], fragment: DocumentFragment): Part[] {
-  const textTemplateCache = new Map<Descriptor, TextTemplate>();
-  
-  return descriptors.map((descriptor, index) => {
-    if (!descriptor) {
-      throw new Error('Missing template descriptor.');
-    }
-    if (descriptor.type === 'node') {
-      const marker = resolvePath(fragment, descriptor.path);
-      if (!(marker instanceof Comment)) {
-        throw new Error('Node descriptor did not resolve to a comment marker.');
-      }
-      return new NodePart(marker);
-    }
-    if (descriptor.type === 'attribute') {
-      const element = resolvePath(fragment, descriptor.path);
-      if (!(element instanceof Element)) {
-        throw new Error('Attribute descriptor did not resolve to an element.');
-      }
-      // Determine which specialized part to create based on attribute name prefix
-      if (descriptor.name.startsWith('@')) {
-        // @event → Event handler
-        const eventName = descriptor.name.slice(1);
-        return new EventAttributePart(element, eventName);
-      } else if (descriptor.name.startsWith('.')) {
-        // .property → Property binding
-        const propertyName = descriptor.name.slice(1);
-        return new PropertyAttributePart(element, propertyName);
-      } else if (descriptor.name.startsWith('?')) {
-        // ?attribute → Boolean attribute (adds/removes based on truthiness)
-        const attributeName = descriptor.name.slice(1);
-        return new BooleanAttributePart(element, attributeName);
-      } else {
-        // Regular attribute
-        return new StandardAttributePart(element, descriptor.name);
-      }
-    }
-    if (descriptor.type === 'textContent') {
-      const element = resolvePath(fragment, descriptor.path);
-      if (!(element instanceof Element)) {
-        throw new Error('TextContent descriptor did not resolve to an element.');
-      }
-      return new TextContentPart(element);
-    }
-    if (descriptor.type === 'textTemplate') {
-      // Get or create shared TextTemplate for this descriptor
-      let textTemplate = textTemplateCache.get(descriptor);
-      if (!textTemplate) {
-        textTemplate = new TextTemplate(descriptor.strings);
-        textTemplateCache.set(descriptor, textTemplate);
-      }
-      
-      // Find which slot this value index corresponds to
-      const slotIndex = descriptor.indices.indexOf(index);
-      if (slotIndex === -1) {
-        throw new Error('Value index not found in textTemplate descriptor indices.');
-      }
-      
-      const element = resolvePath(fragment, descriptor.path);
-      if (!(element instanceof Element)) {
-        throw new Error('TextTemplate descriptor did not resolve to an element.');
-      }
-      
-      if (descriptor.target === 'attribute') {
-        if (!descriptor.name) {
-          throw new Error('TextTemplate attribute descriptor missing name.');
-        }
-        // Determine which binding strategy to use based on attribute name prefix
-        let strategy = ATTRIBUTE_BINDING;
-        let name = descriptor.name;
-        
-        if (descriptor.name.startsWith('.')) {
-          // .property → Property binding
-          strategy = PROPERTY_BINDING;
-          name = descriptor.name.slice(1);
-        } else if (descriptor.name.startsWith('?')) {
-          // ?attribute → Boolean attribute binding
-          strategy = BOOLEAN_ATTRIBUTE_BINDING;
-          name = descriptor.name.slice(1);
-        }
-        
-        return new TemplateAttributePart(element, name, textTemplate, slotIndex, strategy);
-      } else {
-        return new TextContentPart(element, textTemplate, slotIndex);
-      }
-    }
-    throw new Error(`Unknown descriptor type: ${(descriptor as Descriptor).type}`);
-  });
 }

@@ -1,5 +1,5 @@
 export { type DynamicBinding, type TemplateInstance } from './template/render.js';
-export { PartsTemplate } from './template/parts.js';
+export { Template } from './template/template.js';
 export { createSignal, createEffect, createMemo, batch, untrack, onCleanup } from './reactive/signal.js';
 export type { Signal, Memo } from './reactive/signal.js';
 export type { SignalsRuntime as PartRuntime } from './runtime.js';

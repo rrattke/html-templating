@@ -9,7 +9,7 @@ The current implementation mixes concerns:
 ## Solution: 3-Layer Architecture
 
 ```
-Layer 1: Template Parsing (html.ts, template.ts)
+Layer 1: Template Parsing (template.ts)
 ├── Static compilation of template strings to descriptors
 └── No DOM, no values, just structure
 
@@ -109,11 +109,11 @@ target?.range.start.parentElement?.classList.add('highlight');
 
 Currently logic is spread across:
 - `TemplateInstance.create()` - mixes instantiation with effect wiring
-- `NodePart.setValue()` - handles TemplateBinding instantiation and reconciliation
+- `NodePart.setValue()` - handles DynamicBinding instantiation and reconciliation
 - `Reconciler` - handles keyed lists but not general template hierarchy
 
 We need orchestration that:
-1. Resolves values (instantiate TemplateBindings recursively)
+1. Resolves values (instantiate DynamicBindings recursively)
 2. Sets resolved values on parts
 3. Tracks the template hierarchy for reconciliation
 
@@ -124,7 +124,7 @@ We need orchestration that:
 Create a DOM tree from nested templates. No reactivity, no tracking.
 
 ```typescript
-function instantiateStatic(binding: TemplateBinding): DocumentFragment {
+function instantiateStatic(binding: StaticBinding): DocumentFragment {
   const template = binding.getTemplate();
   const fragment = template.cloneFragment();
   const parts = createParts(template.descriptors, fragment, binding.runtime);
@@ -138,7 +138,7 @@ function instantiateStatic(binding: TemplateBinding): DocumentFragment {
 }
 
 function resolveStatic(value: unknown): unknown {
-  if (isTemplateBinding(value)) {
+  if (isStaticBinding(value)) {
     return instantiateStatic(value);  // Recurse
   }
   if (Array.isArray(value)) {
@@ -153,7 +153,7 @@ function resolveStatic(value: unknown): unknown {
 Create a stateful tree that can re-render and reconcile.
 
 ```typescript
-function render(binding: TemplateBinding, container: Node): TemplateState {
+function render(binding: DynamicBinding, container: Node): TemplateState {
   const state = createState(binding, null);
   container.appendChild(state.fragment);
   return state;
@@ -166,7 +166,7 @@ A tree of state objects for reconciliation:
 
 ```typescript
 class TemplateState {
-  readonly binding: TemplateBinding;
+  readonly binding: DynamicBinding;
   readonly instance: TemplateInstance;
   readonly range: NodeRange;
   readonly key: unknown | undefined;
@@ -199,7 +199,7 @@ class TemplateState {
 
 ```typescript
 function createState(
-  binding: TemplateBinding,
+  binding: DynamicBinding,
   parent: TemplateState | null
 ): TemplateState {
   const template = binding.getTemplate();
@@ -260,10 +260,10 @@ function processValue(
   }
   
   // NodePart - may need reconciliation
-  if (isTemplateBinding(value)) {
+  if (isDynamicBinding(value)) {
     // Single template binding
     reconcileSingle(state, part, partIndex, value);
-  } else if (Array.isArray(value) && value.some(isTemplateBinding)) {
+  } else if (Array.isArray(value) && value.some(isDynamicBinding)) { {
     // Array of template bindings
     reconcileArray(state, part, partIndex, value);
   } else {
@@ -282,7 +282,7 @@ function reconcileSingle(
   state: TemplateState,
   part: NodePart,
   partIndex: number,
-  binding: TemplateBinding
+  binding: DynamicBinding
 ): void {
   const existingChildren = state.getChildren(partIndex);
   const existing = existingChildren[0];
@@ -302,7 +302,7 @@ function reconcileSingle(
   part.setValue(child.fragment);
 }
 
-function canReuse(existing: TemplateState, binding: TemplateBinding): boolean {
+function canReuse(existing: TemplateState, binding: DynamicBinding): boolean {
   // Same template structure (same strings array)
   return existing.binding.strings === binding.strings;
 }
@@ -332,13 +332,13 @@ function reconcileArray(
   const reusedKeys = new Set<unknown>();
   
   for (const value of values) {
-    if (!isTemplateBinding(value)) {
+    if (!isDynamicBinding(value)) {
       // Non-template in array - convert to node
       fragment.appendChild(valueToNode(value));
       continue;
     }
     
-    const binding = value as TemplateBinding;
+    const binding = value as DynamicBinding;
     const key = binding.key;
     const existing = key !== undefined ? existingByKey.get(key) : undefined;
     
@@ -412,7 +412,7 @@ Both should go through the same reconciliation mechanism.
 ### Orchestration Flow
 
 ```
-TemplateBinding
+DynamicBinding
      │
      ▼
 ┌─────────────────────────────────────────────┐
@@ -422,7 +422,7 @@ TemplateBinding
 │ 2. Clone fragment                           │
 │ 3. Create parts                             │
 │ 4. For each value:                          │
-│    - If TemplateBinding: recurse (create    │
+│    - If DynamicBinding: recurse (create     │
 │      child TemplateState)                   │
 │    - If array: reconcile children           │
 │    - Else: set on part directly             │
@@ -507,7 +507,7 @@ Parts are used to set values during setup:
 
 **Static case**: Parts used once, then garbage collected
 ```typescript
-function instantiateStatic(binding: TemplateBinding): DocumentFragment {
+function instantiateStatic(binding: StaticBinding): DocumentFragment {
   const fragment = binding.getTemplate().cloneFragment();
   const parts = createParts(...);  // transient
   

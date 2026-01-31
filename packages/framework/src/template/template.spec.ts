@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { DynamicBinding } from './render.js';
-import { getTemplate as getPartsTemplate } from './template.js';
-import { resolvePath } from './html.js';
+import { getTemplate, resolvePath } from './template.js';
 
 const dummyRuntime = { effect: (fn: () => void) => fn() } as any;
 const html = DynamicBinding.with(dummyRuntime);
@@ -10,16 +9,16 @@ describe('html template function', () => {
   describe('template caching', () => {
     it('should cache templates for the same strings array', () => {
       const strings = ['<div>', '</div>'] as unknown as TemplateStringsArray;
-      const record1 = getPartsTemplate(strings);
-      const record2 = getPartsTemplate(strings);
+      const record1 = getTemplate(strings);
+      const record2 = getTemplate(strings);
       expect(record1).toBe(record2);
     });
 
     it('should create different records for different strings', () => {
       const strings1 = ['<div>', '</div>'] as unknown as TemplateStringsArray;
       const strings2 = ['<span>', '</span>'] as unknown as TemplateStringsArray;
-      const record1 = getPartsTemplate(strings1);
-      const record2 = getPartsTemplate(strings2);
+      const record1 = getTemplate(strings1);
+      const record2 = getTemplate(strings2);
       expect(record1).not.toBe(record2);
     });
   });
@@ -27,7 +26,7 @@ describe('html template function', () => {
   describe('node parts', () => {
     it('should create descriptor for single node part', () => {
       const strings = ['<div>', '</div>'] as unknown as TemplateStringsArray;
-      const record = getPartsTemplate(strings);
+      const record = getTemplate(strings);
       
       expect(record.descriptors).toHaveLength(1);
       expect(record.descriptors[0].type).toBe('node');
@@ -35,7 +34,7 @@ describe('html template function', () => {
 
     it('should create descriptors for multiple node parts', () => {
       const strings = ['<div>', ' ', '</div>'] as unknown as TemplateStringsArray;
-      const record = getPartsTemplate(strings);
+      const record = getTemplate(strings);
       
       expect(record.descriptors).toHaveLength(2);
       expect(record.descriptors[0].type).toBe('node');
@@ -44,7 +43,7 @@ describe('html template function', () => {
 
     it('should create correct path for nested node part', () => {
       const strings = ['<div><span>', '</span></div>'] as unknown as TemplateStringsArray;
-      const record = getPartsTemplate(strings);
+      const record = getTemplate(strings);
       
       const fragment = record.cloneFragment();
       const node = resolvePath(fragment, record.descriptors[0].path);
@@ -56,7 +55,7 @@ describe('html template function', () => {
   describe('attribute parts', () => {
     it('should create descriptor for attribute part', () => {
       const strings = ['<div class=', '></div>'] as unknown as TemplateStringsArray;
-      const record = getPartsTemplate(strings);
+      const record = getTemplate(strings);
       
       expect(record.descriptors).toHaveLength(1);
       expect(record.descriptors[0].type).toBe('attribute');
@@ -67,7 +66,7 @@ describe('html template function', () => {
 
     it('should remove attribute marker from element', () => {
       const strings = ['<div class=', '></div>'] as unknown as TemplateStringsArray;
-      const record = getPartsTemplate(strings);
+      const record = getTemplate(strings);
       
       const fragment = record.cloneFragment();
       const div = fragment.querySelector('div');
@@ -76,7 +75,7 @@ describe('html template function', () => {
 
     it('should create descriptors for multiple attributes', () => {
       const strings = ['<div class=', ' id=', '></div>'] as unknown as TemplateStringsArray;
-      const record = getPartsTemplate(strings);
+      const record = getTemplate(strings);
       
       expect(record.descriptors).toHaveLength(2);
       expect(record.descriptors[0].type).toBe('attribute');
@@ -91,7 +90,7 @@ describe('html template function', () => {
 
     it('should resolve attribute part path correctly', () => {
       const strings = ['<div class=', '></div>'] as unknown as TemplateStringsArray;
-      const record = getPartsTemplate(strings);
+      const record = getTemplate(strings);
       
       const fragment = record.cloneFragment();
       const node = resolvePath(fragment, record.descriptors[0].path);
@@ -108,13 +107,13 @@ describe('html template function', () => {
       
       // For now, just document that this doesn't throw
       // TODO: Add better validation for this edge case
-      const template = getPartsTemplate(strings);
+      const template = getTemplate(strings);
       expect(template.descriptors.length).toBeGreaterThan(0);
     });
 
     it('should create TextTemplatePartDescriptor for multiple expressions in one attribute', () => {
       const strings = ['<div class="', ' ', '">',  '</div>'] as unknown as TemplateStringsArray;
-      const template = getPartsTemplate(strings);
+      const template = getTemplate(strings);
       
       expect(template.descriptors).toHaveLength(3); // 3 strings means 2 expressions
       expect(template.descriptors[0].type).toBe('textTemplate');
@@ -134,7 +133,7 @@ describe('html template function', () => {
 
     it('should create TextTemplatePartDescriptor for mixed static and dynamic attribute', () => {
       const strings = ['<div class="prefix-', '-suffix">', '</div>'] as unknown as TemplateStringsArray;
-      const template = getPartsTemplate(strings);
+      const template = getTemplate(strings);
       
       expect(template.descriptors).toHaveLength(2); // 2 strings means 1 expression  + 1 node
       expect(template.descriptors[0].type).toBe('textTemplate');
@@ -150,7 +149,7 @@ describe('html template function', () => {
 
     it('should create TextTemplatePartDescriptor for three expressions in attribute', () => {
       const strings = ['<div class="', ' ', ' ', '">', '</div>'] as unknown as TemplateStringsArray;
-      const template = getPartsTemplate(strings);
+      const template = getTemplate(strings);
       
       expect(template.descriptors).toHaveLength(4); // 4 strings means 3 expressions + 1 node
       expect(template.descriptors[0]).toBe(template.descriptors[1]);
@@ -167,7 +166,7 @@ describe('html template function', () => {
   describe('style tag handling', () => {
     it('should handle dynamic content in style tags', () => {
       const strings = ['<style>', '</style>'] as unknown as TemplateStringsArray;
-      const template = getPartsTemplate(strings);
+      const template = getTemplate(strings);
       
       expect(template.descriptors).toHaveLength(1);
       expect(template.descriptors[0]).toBeDefined();
@@ -181,7 +180,7 @@ describe('html template function', () => {
 
     it('should resolve path to style element for text content replacement', () => {
       const strings = ['<style>', '</style>'] as unknown as TemplateStringsArray;
-      const template = getPartsTemplate(strings);
+      const template = getTemplate(strings);
       
       const fragment = template.cloneFragment();
       const node = resolvePath(fragment, template.descriptors[0].path);
@@ -192,7 +191,7 @@ describe('html template function', () => {
 
     it('should create TextTemplatePartDescriptor for multiple expressions in style tag', () => {
       const strings = ['<style>', ' ', '</style>'] as unknown as TemplateStringsArray;
-      const template = getPartsTemplate(strings);
+      const template = getTemplate(strings);
       
       expect(template.descriptors).toHaveLength(2);
       expect(template.descriptors[0].type).toBe('textTemplate');
@@ -208,7 +207,7 @@ describe('html template function', () => {
 
     it('should create TextTemplatePartDescriptor for mixed static and dynamic in style', () => {
       const strings = ['<style>:host { color: ', '; background: ', '; }</style>'] as unknown as TemplateStringsArray;
-      const template = getPartsTemplate(strings);
+      const template = getTemplate(strings);
       
       expect(template.descriptors).toHaveLength(2);
       expect(template.descriptors[0]).toBe(template.descriptors[1]);
@@ -228,7 +227,7 @@ describe('html template function', () => {
   describe('mixed content', () => {
     it('should handle both node and attribute parts', () => {
       const strings = ['<div class=', '>', '</div>'] as unknown as TemplateStringsArray;
-      const template = getPartsTemplate(strings);
+      const template = getTemplate(strings);
       
       expect(template.descriptors).toHaveLength(2);
       expect(template.descriptors[0].type).toBe('attribute');
@@ -243,7 +242,7 @@ describe('html template function', () => {
         '>',
         '</p></div>'
       ] as unknown as TemplateStringsArray;
-      const template = getPartsTemplate(strings);
+      const template = getTemplate(strings);
       
       expect(template.descriptors).toHaveLength(4);
       expect(template.descriptors[0].type).toBe('attribute');
@@ -321,7 +320,7 @@ describe('html template function', () => {
   describe('Descriptor Validation', () => {
     it('should create attribute descriptor with correct name for @click', () => {
       const strings = ['<button @click=', '>Click</button>'] as unknown as TemplateStringsArray;
-      const template = getPartsTemplate(strings);
+      const template = getTemplate(strings);
       
       expect(template.descriptors).toHaveLength(1);
       expect(template.descriptors[0].type).toBe('attribute');
@@ -332,7 +331,7 @@ describe('html template function', () => {
 
     it('should create attribute descriptor with correct name for .value', () => {
       const strings = ['<input .value=', '>'] as unknown as TemplateStringsArray;
-      const template = getPartsTemplate(strings);
+      const template = getTemplate(strings);
       
       expect(template.descriptors).toHaveLength(1);
       expect(template.descriptors[0].type).toBe('attribute');
@@ -343,7 +342,7 @@ describe('html template function', () => {
 
     it('should create attribute descriptor with correct name for ?disabled', () => {
       const strings = ['<button ?disabled=', '>Click</button>'] as unknown as TemplateStringsArray;
-      const template = getPartsTemplate(strings);
+      const template = getTemplate(strings);
       
       expect(template.descriptors).toHaveLength(1);
       expect(template.descriptors[0].type).toBe('attribute');
@@ -354,7 +353,7 @@ describe('html template function', () => {
 
     it('should preserve prefixes in descriptor names', () => {
       const strings = ['<button @click=', ' .disabled=', ' ?hidden=', '>Click</button>'] as unknown as TemplateStringsArray;
-      const template = getPartsTemplate(strings);
+      const template = getTemplate(strings);
       
       expect(template.descriptors).toHaveLength(3);
       expect(template.descriptors[0].type).toBe('attribute');

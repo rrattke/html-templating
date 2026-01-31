@@ -2,7 +2,17 @@
 export { NodeRange } from './dom.js';
 
 // Template compilation (Layer 1)
-export { Template, getTemplate } from './template.js';
+export { 
+  Template, 
+  getTemplate,
+  resolvePath,
+  type Descriptor,
+  type PartDescriptor,
+  type NodePartDescriptor,
+  type AttributePartDescriptor,
+  type TextContentPartDescriptor,
+  type TextTemplatePartDescriptor
+} from './template.js';
 
 // Parts - stateless value application (Layer 2)
 export { 
@@ -14,6 +24,7 @@ export {
   TemplateAttributePart,
   TextContentPart,
   TextTemplate,
+  createParts,
   type Part
 } from './parts.js';
 
@@ -25,6 +36,3 @@ export {
   InstanceState, 
   Reconciler
 } from './render.js';
-
-// Backward compatibility aliases
-export { Template as PartsTemplate, getTemplate as getPartsTemplate } from './template.js';
