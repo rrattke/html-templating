@@ -32,7 +32,5 @@ export {
 export { 
   StaticBinding,
   DynamicBinding,
-  TemplateInstance, 
-  InstanceState, 
-  Reconciler
+  TemplateInstance
 } from './render.js';

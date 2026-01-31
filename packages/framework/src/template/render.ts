@@ -8,6 +8,7 @@ import { Template, getTemplate } from './template.js';
 import { 
   EventAttributePart, 
   createParts,
+  KeepInPlace,
   type Part
 } from './parts.js';
 import type { SignalsRuntime } from '../runtime.js';
@@ -76,7 +77,7 @@ export class StaticBinding {
  */
 function processValueStatic(value: unknown): unknown {
   // Handle StaticBinding by rendering it
-  if (isStaticBinding(value)) {
+  if (value instanceof StaticBinding) {
     return value.render();
   }
   
@@ -91,42 +92,183 @@ function processValueStatic(value: unknown): unknown {
 
 /**
  * Process a value by instantiating any DynamicBindings.
- * Nested instances are tracked for disposal.
+ * Child instances are tracked on the parent for reconciliation.
  */
-function processValue(value: unknown, runtime: SignalsRuntime, nestedInstances: TemplateInstance[]): unknown {
-  // Handle DynamicBinding by instantiating it
-  if (isDynamicBinding(value)) {
-    const instance = TemplateInstance.create(runtime, value.getTemplate(), value.values);
-    nestedInstances.push(instance);
+function processValue(value: unknown, runtime: SignalsRuntime, parent: TemplateInstance): unknown {
+  // Handle DynamicBinding by instantiating it (or reusing existing)
+  if (value instanceof DynamicBinding) {
+    const { instance, reused } = parent.getOrCreateChild(value.key, () => 
+      TemplateInstance.create(runtime, value.getTemplate(), value.values)
+    );
+    
+    if (reused) {
+      // Extract DOM nodes from their current location for reinsertion
+      return instance.extractContent();
+    }
     return instance.fragment;
   }
   
   // Handle StaticBinding by rendering it (allows mixing static in dynamic templates)
-  if (isStaticBinding(value)) {
+  if (value instanceof StaticBinding) {
     return value.render();
   }
   
   // Handle arrays/iterables recursively
   if (isIterable(value)) {
-    return Array.from(value).map(item => processValue(item, runtime, nestedInstances));
+    return Array.from(value).map(item => processValue(item, runtime, parent));
   }
   
   // Pass through everything else (nodes, primitives, null, etc.)
   return value;
 }
 
-function isStaticBinding(value: unknown): value is StaticBinding {
-  if (value == null || typeof value !== 'object') {
-    return false;
+/**
+ * Process a list value with optimized reconciliation.
+ * Only moves items that have actually changed position.
+ * Returns KeepInPlace markers for items that shouldn't move.
+ */
+export function processListValue(value: unknown, runtime: SignalsRuntime, parent: TemplateInstance): unknown {
+  if (!isIterable(value)) {
+    return processValue(value, runtime, parent);
   }
-  return 'strings' in (value as Record<string, unknown>) && 'values' in (value as Record<string, unknown>);
+  
+  const items = Array.from(value);
+  
+  // Check if we have keyed items
+  const hasKeys = items.some(item => item instanceof DynamicBinding && item.key !== undefined);
+  
+  if (!hasKeys) {
+    // No keys - just process each item
+    return items.map(item => processValue(item, runtime, parent));
+  }
+  
+  return reconcileKeyedList(items, runtime, parent);
 }
 
-function isDynamicBinding(value: unknown): value is DynamicBinding {
-  if (!isStaticBinding(value)) {
-    return false;
+/**
+ * Reconciles a list of keyed items, minimizing DOM mutations.
+ * Only extracts items that have actually changed position.
+ */
+function reconcileKeyedList(items: unknown[], runtime: SignalsRuntime, parent: TemplateInstance): unknown[] {
+  const result: unknown[] = [];
+  const newKeyOrder: unknown[] = [];
+  
+  // First pass: collect keys and get/create instances
+  const instances: Array<{ item: unknown; instance?: TemplateInstance; reused?: boolean; key?: unknown }> = [];
+  for (const item of items) {
+    if (item instanceof DynamicBinding && item.key !== undefined) {
+      const { instance, reused } = parent.getOrCreateChild(item.key, () => 
+        TemplateInstance.create(runtime, item.getTemplate(), item.values)
+      );
+      instances.push({ item, instance, reused, key: item.key });
+      newKeyOrder.push(item.key);
+    } else {
+      instances.push({ item });
+    }
   }
-  return 'runtime' in value;
+  
+  // Get the previous order of keys
+  const oldKeyOrder = parent.getChildKeyOrder();
+  
+  // Compute which items need to move
+  const needsMove = computeItemsToMove(oldKeyOrder, newKeyOrder);
+  
+  // Second pass: build result, only extracting items that need to move
+  for (const { item, instance, reused, key } of instances) {
+    if (instance) {
+      if (!reused) {
+        // New item - use fragment
+        result.push(instance.fragment);
+      } else if (needsMove.has(key)) {
+        // Reused but needs to move - extract and reinsert
+        result.push(instance.extractContent());
+      } else {
+        // Reused and in same position - keep in place
+        result.push(new KeepInPlace(instance.range));
+      }
+    } else {
+      // Non-keyed item, process recursively
+      result.push(processValue(item, runtime, parent));
+    }
+  }
+  
+  // Update the parent's child order
+  parent.setChildKeyOrder(newKeyOrder);
+  
+  return result;
+}
+
+/**
+ * Computes which items need to move based on comparing old and new key orders.
+ * Uses longest increasing subsequence to minimize moves.
+ */
+function computeItemsToMove(oldOrder: unknown[], newOrder: unknown[]): Set<unknown> {
+  // Build index map for old order
+  const oldIndexMap = new Map<unknown, number>();
+  for (let i = 0; i < oldOrder.length; i++) {
+    oldIndexMap.set(oldOrder[i], i);
+  }
+  
+  // Get indices in old array for each item in new array
+  const oldIndices: number[] = [];
+  const newKeys: unknown[] = [];
+  for (const key of newOrder) {
+    if (oldIndexMap.has(key)) {
+      oldIndices.push(oldIndexMap.get(key)!);
+      newKeys.push(key);
+    }
+  }
+  
+  // Find longest increasing subsequence - these items don't need to move
+  const lis = longestIncreasingSubsequence(oldIndices);
+  const stableIndices = new Set(lis);
+  
+  // Items not in the LIS need to move
+  const needsMove = new Set<unknown>();
+  for (let i = 0; i < oldIndices.length; i++) {
+    if (!stableIndices.has(i)) {
+      needsMove.add(newKeys[i]);
+    }
+  }
+  
+  return needsMove;
+}
+
+/**
+ * Returns the indices of the longest increasing subsequence.
+ */
+function longestIncreasingSubsequence(arr: number[]): number[] {
+  if (arr.length === 0) return [];
+  
+  const n = arr.length;
+  const dp: number[] = new Array(n).fill(1);
+  const parent: number[] = new Array(n).fill(-1);
+  
+  let maxLen = 1;
+  let maxIdx = 0;
+  
+  for (let i = 1; i < n; i++) {
+    for (let j = 0; j < i; j++) {
+      if (arr[j] < arr[i] && dp[j] + 1 > dp[i]) {
+        dp[i] = dp[j] + 1;
+        parent[i] = j;
+      }
+    }
+    if (dp[i] > maxLen) {
+      maxLen = dp[i];
+      maxIdx = i;
+    }
+  }
+  
+  // Reconstruct the indices
+  const result: number[] = [];
+  let idx = maxIdx;
+  while (idx !== -1) {
+    result.push(idx);
+    idx = parent[idx];
+  }
+  
+  return result.reverse();
 }
 
 function isIterable(value: unknown): value is Iterable<unknown> {
@@ -139,23 +281,95 @@ function isIterable(value: unknown): value is Iterable<unknown> {
 /**
  * Realized template in the DOM.
  * Has behavior: dispose() cleans up effects and event listeners.
+ * Tracks child instances for reconciliation.
  */
 export class TemplateInstance {
   readonly fragment: DocumentFragment;
   readonly parts: Part[];
   readonly #dispose: () => void;
+  
+  // DOM range tracking - where our content lives in the document
+  #range: NodeRange;
+  
+  // Child instance tracking for reconciliation
+  #children: TemplateInstance[] = [];
+  #childrenByKey = new Map<unknown, TemplateInstance>();
+  #childKeyOrder: unknown[] = [];
 
-  constructor(fragment: DocumentFragment, parts: Part[], dispose: () => void) {
+  constructor(fragment: DocumentFragment, parts: Part[], dispose: () => void, range: NodeRange) {
     this.fragment = fragment;
     this.parts = parts;
     this.#dispose = dispose;
+    this.#range = range;
+  }
+
+  get children(): readonly TemplateInstance[] {
+    return this.#children;
+  }
+
+  get range(): NodeRange {
+    return this.#range;
+  }
+
+  getChildKeyOrder(): unknown[] {
+    return this.#childKeyOrder;
+  }
+
+  setChildKeyOrder(order: unknown[]): void {
+    this.#childKeyOrder = order;
   }
 
   /**
-   * Disposes all reactive effects and event listeners.
+   * Extracts this instance's DOM nodes from the document.
+   * Returns a DocumentFragment containing the nodes (including the start marker).
+   * The range remains valid and will track the new location after reinsertion.
+   */
+  extractContent(): DocumentFragment {
+    const fragment = document.createDocumentFragment();
+    
+    // Include the start marker so the range stays valid after reinsertion
+    let node: Node | null = this.#range.start;
+    const end = this.#range.end;
+    
+    while (node) {
+      const next: Node | null = node.nextSibling;
+      fragment.appendChild(node);
+      if (node === end) break;
+      node = next;
+    }
+    
+    return fragment;
+  }
+
+  /**
+   * Disposes all reactive effects, event listeners, and child instances.
    */
   dispose(): void {
+    for (const child of this.#children) {
+      child.dispose();
+    }
+    this.#children = [];
+    this.#childrenByKey.clear();
     this.#dispose();
+  }
+
+  /**
+   * Gets or creates a child instance for a keyed binding.
+   * If an instance with the same key exists, it's reused and its DOM content extracted.
+   * Returns the instance and whether it was reused.
+   */
+  getOrCreateChild(key: unknown, create: () => TemplateInstance): { instance: TemplateInstance; reused: boolean } {
+    if (key !== undefined && this.#childrenByKey.has(key)) {
+      const instance = this.#childrenByKey.get(key)!;
+      return { instance, reused: true };
+    }
+    
+    const instance = create();
+    this.#children.push(instance);
+    if (key !== undefined) {
+      this.#childrenByKey.set(key, instance);
+    }
+    return { instance, reused: false };
   }
 
   /**
@@ -169,7 +383,18 @@ export class TemplateInstance {
     const fragment = template.cloneFragment();
     const parts = createParts(template.descriptors, fragment);
     const disposers: Array<() => void> = [];
-    const nestedInstances: TemplateInstance[] = [];
+
+    // Create start marker and range to track where our content is
+    const startMarker = document.createComment('');
+    fragment.insertBefore(startMarker, fragment.firstChild);
+    const range = new NodeRange(startMarker, fragment.lastChild ?? startMarker);
+
+    // Create instance first so children can be tracked
+    const instance = new TemplateInstance(fragment, parts, () => {
+      for (const disposer of disposers) {
+        disposer();
+      }
+    }, range);
 
     parts.forEach((part, index) => {
       const value = values[index];
@@ -181,27 +406,19 @@ export class TemplateInstance {
         else {
           const dispose = runtime.effect(() => {
             const result = value();
-            const processed = processValue(result, runtime, nestedInstances);
+            // Use processListValue for optimized list reconciliation
+            const processed = processListValue(result, runtime, instance);
             part.setValue(processed);
           });
           disposers.push(dispose);
         }
       } else {
-        const processed = processValue(value, runtime, nestedInstances);
+        const processed = processValue(value, runtime, instance);
         part.setValue(processed);
       }
     });
 
-    const dispose = () => {
-      for (const instance of nestedInstances) {
-        instance.dispose();
-      }
-      for (const disposer of disposers) {
-        disposer();
-      }
-    };
-
-    return new TemplateInstance(fragment, parts, dispose);
+    return instance;
   }
 }
 
@@ -260,165 +477,5 @@ export class DynamicBinding extends StaticBinding {
 
   instance() {
     return TemplateInstance.create(this.#runtime, this.getTemplate(), this.values);
-  }
-}
-
-/**
- * Reconciliation bookkeeping for a single template instance.
- * Tracks the key, DOM range, and instance for efficient reuse and moves.
- */
-export class InstanceState {
-  readonly key: unknown | undefined;
-  readonly range: NodeRange;
-  readonly instance: TemplateInstance;
-
-  constructor(key: unknown | undefined, range: NodeRange, instance: TemplateInstance) {
-    this.key = key;
-    this.range = range;
-    this.instance = instance;
-  }
-
-  /**
-   * Disposes the template instance (cleans up effects and event listeners).
-   */
-  dispose(): void {
-    this.instance.dispose();
-  }
-
-  /**
-   * Moves all nodes in this instance's range before the reference node.
-   * Uses in-place DOM moves, preserving element identity.
-   */
-  moveBefore(referenceNode: Node, parent: Node): void {
-    let node: Node | null = this.range.start;
-    const end = this.range.end;
-
-    while (node) {
-      const next: Node | null = node.nextSibling;
-      parent.insertBefore(node, referenceNode);
-      if (node === end) break;
-      node = next;
-    }
-  }
-}
-
-/**
- * Reconciler for template bindings.
- * Manages a list of InstanceState entries by key, efficiently reusing
- * existing instances and performing in-place DOM moves.
- */
-export class Reconciler {
-  #parent: Node;
-  #states: InstanceState[] = [];
-  #statesByKey = new Map<unknown, InstanceState>();
-  #endMarker: Comment;
-
-  constructor(parent: Node) {
-    this.#parent = parent;
-    this.#endMarker = document.createComment('');
-    parent.appendChild(this.#endMarker);
-  }
-
-  /**
-   * The end marker comment node that marks the end of the reconciled content.
-   */
-  get endMarker(): Comment {
-    return this.#endMarker;
-  }
-
-  /**
-   * Current tracked instance states.
-   */
-  get states(): readonly InstanceState[] {
-    return this.#states;
-  }
-
-  /**
-   * Renders a list of template bindings, reusing existing instances by key
-   * and performing minimal DOM operations.
-   */
-  render(bindings: DynamicBinding[]): void {
-    const reusedKeys = new Set<unknown>();
-    const newStates: InstanceState[] = [];
-
-    // Process in reverse for efficient insertion before reference node
-    let referenceNode: Node = this.#endMarker;
-
-    for (let i = bindings.length - 1; i >= 0; i--) {
-      const binding = bindings[i];
-      const key = binding.key;
-
-      if (key !== undefined && this.#statesByKey.has(key) && !reusedKeys.has(key)) {
-        // Reuse existing state
-        const existing = this.#statesByKey.get(key)!;
-        reusedKeys.add(key);
-        existing.moveBefore(referenceNode, this.#parent);
-        newStates.unshift(existing);
-        referenceNode = existing.range.start;
-      } else {
-        // Create new state
-        const state = this.#createState(binding);
-        this.#insertStateBefore(state, referenceNode);
-        newStates.unshift(state);
-        referenceNode = state.range.start;
-      }
-    }
-
-    // Dispose unused states
-    for (const state of this.#states) {
-      if (state.key === undefined || !reusedKeys.has(state.key)) {
-        state.dispose();
-        state.range.deleteContents();
-      }
-    }
-
-    // Update tracking
-    this.#states = newStates;
-    this.#statesByKey.clear();
-    for (const state of newStates) {
-      if (state.key !== undefined) {
-        this.#statesByKey.set(state.key, state);
-      }
-    }
-  }
-
-  #createState(binding: DynamicBinding): InstanceState {
-    const instance = binding.instance();
-    const startMarker = document.createComment('');
-
-    // Wrap fragment with markers for range tracking
-    instance.fragment.insertBefore(startMarker, instance.fragment.firstChild);
-    const range = new NodeRange(startMarker);
-    if (instance.fragment.lastChild) {
-      range.setEnd(instance.fragment.lastChild);
-    }
-
-    return new InstanceState(binding.key, range, instance);
-  }
-
-  #insertStateBefore(state: InstanceState, referenceNode: Node): void {
-    // Collect all nodes from the range
-    let node: Node | null = state.range.start;
-    const end = state.range.end;
-
-    while (node) {
-      const next: Node | null = node.nextSibling;
-      this.#parent.insertBefore(node, referenceNode);
-      if (node === end) break;
-      node = next;
-    }
-  }
-
-  /**
-   * Disposes all tracked instances and removes the end marker.
-   */
-  dispose(): void {
-    for (const state of this.#states) {
-      state.dispose();
-      state.range.deleteContents();
-    }
-    this.#states = [];
-    this.#statesByKey.clear();
-    this.#endMarker.remove();
   }
 }

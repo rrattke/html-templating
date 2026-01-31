@@ -1,244 +1,11 @@
 /**
- * Tests for Reconciler class.
- * Verifies keyed reconciliation with DOM element identity preservation.
+ * Tests for render.ts module.
+ * Verifies template instantiation and binding functionality.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { Reconciler, DynamicBinding, TemplateInstance } from './render.js';
+import { DynamicBinding, TemplateInstance } from './render.js';
 import { StandardAttributePart, PropertyAttributePart, BooleanAttributePart, EventAttributePart } from './parts.js';
-
-describe('Reconciler', () => {
-  let container: HTMLElement;
-  let reconciler: Reconciler;
-
-  // Create a mock runtime for testing
-  const dummyRuntime = {
-    effect: (fn: () => void) => {
-      fn();
-      return () => {};
-    }
-  } as any;
-
-  // Create the html function for the mock runtime
-  const html = DynamicBinding.with(dummyRuntime);
-
-  beforeEach(() => {
-    container = document.createElement('div');
-    document.body.appendChild(container);
-    reconciler = new Reconciler(container);
-  });
-
-  afterEach(() => {
-    reconciler.dispose();
-    container.remove();
-  });
-
-  describe('basic rendering', () => {
-    it('should render a single binding', () => {
-      const bindings = [html('a')`<span>A</span>`];
-      reconciler.render(bindings);
-
-      expect(container.textContent).toBe('A');
-      expect(reconciler.states.length).toBe(1);
-    });
-
-    it('should render multiple bindings', () => {
-      const bindings = [
-        html('a')`<span>A</span>`,
-        html('b')`<span>B</span>`,
-        html('c')`<span>C</span>`
-      ];
-      reconciler.render(bindings);
-
-      expect(container.textContent).toBe('ABC');
-      expect(reconciler.states.length).toBe(3);
-    });
-
-    it('should handle empty bindings array', () => {
-      reconciler.render([]);
-
-      expect(container.textContent).toBe('');
-      expect(reconciler.states.length).toBe(0);
-    });
-  });
-
-  describe('keyed reconciliation', () => {
-    it('should reuse DOM elements for same keys', () => {
-      const bindings1 = [
-        html('a')`<span>A</span>`,
-        html('b')`<span>B</span>`
-      ];
-      reconciler.render(bindings1);
-
-      const spanA1 = container.querySelector('span');
-      expect(spanA1?.textContent).toBe('A');
-
-      const bindings2 = [
-        html('a')`<span>A-updated</span>`,
-        html('b')`<span>B-updated</span>`
-      ];
-      reconciler.render(bindings2);
-
-      const spanA2 = container.querySelector('span');
-      // The DOM element should be the same (reused)
-      expect(spanA2).toBe(spanA1);
-      // Content should be unchanged (reused instance keeps old content)
-      expect(spanA2?.textContent).toBe('A');
-    });
-
-    it('should reorder elements when key order changes', () => {
-      const bindings1 = [
-        html('a')`<span>A</span>`,
-        html('b')`<span>B</span>`,
-        html('c')`<span>C</span>`
-      ];
-      reconciler.render(bindings1);
-
-      const spans1 = container.querySelectorAll('span');
-      const spanA = spans1[0];
-      const spanB = spans1[1];
-      const spanC = spans1[2];
-
-      expect(container.textContent).toBe('ABC');
-
-      // Reorder: C, A, B
-      const bindings2 = [
-        html('c')`<span>C</span>`,
-        html('a')`<span>A</span>`,
-        html('b')`<span>B</span>`
-      ];
-      reconciler.render(bindings2);
-
-      const spans2 = container.querySelectorAll('span');
-      // Same DOM elements, different order
-      expect(spans2[0]).toBe(spanC);
-      expect(spans2[1]).toBe(spanA);
-      expect(spans2[2]).toBe(spanB);
-      expect(container.textContent).toBe('CAB');
-    });
-
-    it('should dispose removed items', () => {
-      const bindings1 = [
-        html('a')`<span>A</span>`,
-        html('b')`<span>B</span>`,
-        html('c')`<span>C</span>`
-      ];
-      reconciler.render(bindings1);
-
-      expect(reconciler.states.length).toBe(3);
-
-      // Remove 'b'
-      const bindings2 = [
-        html('a')`<span>A</span>`,
-        html('c')`<span>C</span>`
-      ];
-      reconciler.render(bindings2);
-
-      expect(reconciler.states.length).toBe(2);
-      expect(container.textContent).toBe('AC');
-    });
-
-    it('should add new items at correct position', () => {
-      const bindings1 = [
-        html('a')`<span>A</span>`,
-        html('c')`<span>C</span>`
-      ];
-      reconciler.render(bindings1);
-
-      expect(container.textContent).toBe('AC');
-
-      // Add 'b' in between
-      const bindings2 = [
-        html('a')`<span>A</span>`,
-        html('b')`<span>B</span>`,
-        html('c')`<span>C</span>`
-      ];
-      reconciler.render(bindings2);
-
-      expect(container.textContent).toBe('ABC');
-      expect(reconciler.states.length).toBe(3);
-    });
-  });
-
-  describe('DOM identity preservation', () => {
-    it('should preserve element identity across reorders', () => {
-      const bindings1 = [
-        html('item1')`<div id="item1">Item 1</div>`,
-        html('item2')`<div id="item2">Item 2</div>`,
-        html('item3')`<div id="item3">Item 3</div>`
-      ];
-      reconciler.render(bindings1);
-
-      const item1Before = container.querySelector('#item1');
-      const item2Before = container.querySelector('#item2');
-      const item3Before = container.querySelector('#item3');
-
-      // Reverse order
-      const bindings2 = [
-        html('item3')`<div id="item3">Item 3</div>`,
-        html('item2')`<div id="item2">Item 2</div>`,
-        html('item1')`<div id="item1">Item 1</div>`
-      ];
-      reconciler.render(bindings2);
-
-      const item1After = container.querySelector('#item1');
-      const item2After = container.querySelector('#item2');
-      const item3After = container.querySelector('#item3');
-
-      // Same DOM elements, just moved
-      expect(item1After).toBe(item1Before);
-      expect(item2After).toBe(item2Before);
-      expect(item3After).toBe(item3Before);
-
-      // Verify new order
-      const items = container.querySelectorAll('div');
-      expect(items[0]).toBe(item3Before);
-      expect(items[1]).toBe(item2Before);
-      expect(items[2]).toBe(item1Before);
-    });
-  });
-
-  describe('InstanceState', () => {
-    it('should track key on state', () => {
-      const bindings = [
-        html('myKey')`<span>Content</span>`
-      ];
-      reconciler.render(bindings);
-
-      expect(reconciler.states[0].key).toBe('myKey');
-    });
-
-    it('should support various key types', () => {
-      const bindings = [
-        html(1)`<span>Number</span>`,
-        html('str')`<span>String</span>`,
-        html(true)`<span>Boolean</span>`
-      ];
-      reconciler.render(bindings);
-
-      expect(reconciler.states[0].key).toBe(1);
-      expect(reconciler.states[1].key).toBe('str');
-      expect(reconciler.states[2].key).toBe(true);
-    });
-  });
-
-  describe('cleanup', () => {
-    it('should dispose all states on reconciler.dispose()', () => {
-      const bindings = [
-        html('a')`<span>A</span>`,
-        html('b')`<span>B</span>`
-      ];
-      reconciler.render(bindings);
-
-      expect(container.children.length).toBeGreaterThan(0);
-
-      reconciler.dispose();
-
-      // Container should only have the end marker removed
-      expect(reconciler.states.length).toBe(0);
-    });
-  });
-});
 
 describe('Template to Part Translation', () => {
   // Create a mock runtime for testing
@@ -1325,5 +1092,442 @@ describe('StaticBinding.render()', () => {
     const result = template.render();
 
     expect(result).toBeInstanceOf(DocumentFragment);
+  });
+});
+
+/**
+ * FAILING TEST: Documents the list reconciliation problem.
+ * 
+ * When moving an item in a keyed list, the current implementation recreates
+ * ALL list items instead of just moving the DOM nodes. This causes:
+ * 1. Visual flashing in the browser
+ * 2. Loss of DOM state (focus, scroll position, animations)
+ * 3. Unnecessary performance overhead
+ */
+describe('List Reconciliation - DOM Identity Preservation', () => {
+  let container: HTMLElement;
+  let effectCallbacks: Array<() => void>;
+  
+  // Runtime that tracks effects so we can re-trigger them
+  const trackingRuntime = {
+    effect: (fn: () => void) => {
+      effectCallbacks.push(fn);
+      fn(); // Run immediately
+      return () => {
+        const index = effectCallbacks.indexOf(fn);
+        if (index >= 0) effectCallbacks.splice(index, 1);
+      };
+    }
+  } as any;
+
+  const html = DynamicBinding.with(trackingRuntime);
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    effectCallbacks = [];
+  });
+
+  afterEach(() => {
+    container.remove();
+  });
+
+  function rerunEffects() {
+    for (const fn of effectCallbacks) {
+      fn();
+    }
+  }
+
+  it('should preserve DOM identity when reordering keyed items', () => {
+    // Setup: Render a list with 3 items
+    let items = [
+      { id: 'a', label: 'Item A' },
+      { id: 'b', label: 'Item B' },
+      { id: 'c', label: 'Item C' }
+    ];
+
+    // Template factory using keys
+    const itemTemplate = (item: { id: string; label: string }) => 
+      html(item.id)`<li data-id="${item.id}">${item.label}</li>`;
+
+    const template = html`<ul>${() => items.map(itemTemplate)}</ul>`;
+    const instance = template.instance();
+    container.appendChild(instance.fragment);
+
+    // Verify initial render
+    const lisBefore = container.querySelectorAll('li');
+    expect(lisBefore).toHaveLength(3);
+    
+    // Capture DOM references BEFORE the move
+    const liA = lisBefore[0];
+    const liB = lisBefore[1];
+    const liC = lisBefore[2];
+    
+    expect(liA.dataset.id).toBe('a');
+    expect(liB.dataset.id).toBe('b');
+    expect(liC.dataset.id).toBe('c');
+
+    // Move item C to the front: [C, A, B]
+    items = [items[2], items[0], items[1]];
+    rerunEffects();
+
+    // Verify new order
+    const lisAfter = container.querySelectorAll('li');
+    expect(lisAfter).toHaveLength(3);
+    expect(lisAfter[0].dataset.id).toBe('c');
+    expect(lisAfter[1].dataset.id).toBe('a');
+    expect(lisAfter[2].dataset.id).toBe('b');
+
+    // THE CRITICAL CHECK: Are the DOM nodes the SAME objects?
+    // If reconciliation is working, these should be the exact same DOM nodes,
+    // just in a different order. If it's broken, they'll be new nodes.
+    expect(lisAfter[0]).toBe(liC); // C moved to position 0
+    expect(lisAfter[1]).toBe(liA); // A moved to position 1
+    expect(lisAfter[2]).toBe(liB); // B moved to position 2
+  });
+
+  it('should only touch moved nodes, not recreate all nodes', () => {
+    let items = [
+      { id: 'a', label: 'Item A' },
+      { id: 'b', label: 'Item B' },
+      { id: 'c', label: 'Item C' }
+    ];
+
+    const itemTemplate = (item: { id: string; label: string }) => 
+      html(item.id)`<li data-id="${item.id}">${item.label}</li>`;
+
+    const template = html`<ul>${() => items.map(itemTemplate)}</ul>`;
+    const instance = template.instance();
+    container.appendChild(instance.fragment);
+
+    const ul = container.querySelector('ul')!;
+    const liA = container.querySelector('[data-id="a"]')!;
+    const liB = container.querySelector('[data-id="b"]')!;
+    const liC = container.querySelector('[data-id="c"]')!;
+
+    // Track DOM mutations
+    const mutations: Array<{ type: string; node: Node; tagName?: string }> = [];
+    const observer = new MutationObserver((records) => {
+      for (const record of records) {
+        for (const node of record.addedNodes) {
+          mutations.push({ 
+            type: 'added', 
+            node,
+            tagName: (node as Element).tagName 
+          });
+        }
+        for (const node of record.removedNodes) {
+          mutations.push({ 
+            type: 'removed', 
+            node,
+            tagName: (node as Element).tagName 
+          });
+        }
+      }
+    });
+    observer.observe(ul, { childList: true, subtree: true });
+
+    // Move C to front: [C, A, B]
+    items = [items[2], items[0], items[1]];
+    rerunEffects();
+    observer.disconnect();
+
+    // Verify DOM nodes are the SAME objects, just reordered
+    const lisAfter = container.querySelectorAll('li');
+    expect(lisAfter[0]).toBe(liC);
+    expect(lisAfter[1]).toBe(liA);
+    expect(lisAfter[2]).toBe(liB);
+  });
+
+  it('should not move items that have not changed position', () => {
+    let items = [
+      { id: 'a', label: 'Item A' },
+      { id: 'b', label: 'Item B' },
+      { id: 'c', label: 'Item C' }
+    ];
+
+    let extractContentCalls = 0;
+    const originalExtractContent = TemplateInstance.prototype.extractContent;
+    TemplateInstance.prototype.extractContent = function() {
+      extractContentCalls++;
+      return originalExtractContent.call(this);
+    };
+
+    const itemTemplate = (item: { id: string; label: string }) => 
+      html(item.id)`<li data-id="${item.id}">${item.label}</li>`;
+
+    const template = html`<ul>${() => items.map(itemTemplate)}</ul>`;
+    const instance = template.instance();
+    container.appendChild(instance.fragment);
+
+    const ul = container.querySelector('ul')!;
+    const liA = container.querySelector('[data-id="a"]')!;
+    const liB = container.querySelector('[data-id="b"]')!;
+    const liC = container.querySelector('[data-id="c"]')!;
+
+    extractContentCalls = 0; // Reset after initial render
+
+    // Track ALL DOM mutations on the UL
+    const mutations: MutationRecord[] = [];
+    const observer = new MutationObserver((records) => {
+      mutations.push(...records);
+    });
+    observer.observe(ul, { childList: true });
+
+    // Same items, same order - nothing should be moved
+    items = [...items];
+    rerunEffects();
+    observer.disconnect();
+    
+    // Restore original
+    TemplateInstance.prototype.extractContent = originalExtractContent;
+
+    // extractContent should NOT be called for items in the same position
+    expect(extractContentCalls).toBe(0);
+
+    // No mutations should have occurred - items are in the same position!
+    expect(mutations).toHaveLength(0);
+
+    // Also verify DOM nodes are still the same objects
+    expect(container.querySelector('[data-id="a"]')).toBe(liA);
+    expect(container.querySelector('[data-id="b"]')).toBe(liB);
+    expect(container.querySelector('[data-id="c"]')).toBe(liC);
+  });
+
+  it('should only extract items that actually move, leaving others in place', () => {
+    let items = [
+      { id: 'a', label: 'Item A' },
+      { id: 'b', label: 'Item B' },
+      { id: 'c', label: 'Item C' }
+    ];
+
+    const extractedKeys: string[] = [];
+    const originalExtractContent = TemplateInstance.prototype.extractContent;
+    TemplateInstance.prototype.extractContent = function() {
+      // Try to identify which item this is by checking the DOM
+      const firstElement = this.range.start.nextSibling as Element;
+      if (firstElement?.dataset?.id) {
+        extractedKeys.push(firstElement.dataset.id);
+      }
+      return originalExtractContent.call(this);
+    };
+
+    const itemTemplate = (item: { id: string; label: string }) => 
+      html(item.id)`<li data-id="${item.id}">${item.label}</li>`;
+
+    const template = html`<ul>${() => items.map(itemTemplate)}</ul>`;
+    const instance = template.instance();
+    container.appendChild(instance.fragment);
+
+    extractedKeys.length = 0; // Reset after initial render
+
+    // Move C to front: [C, A, B]
+    // With LIS algorithm:
+    // - Old positions: A=0, B=1, C=2
+    // - New positions: C=0, A=1, B=2
+    // - Indices in old: [2, 0, 1]
+    // - LIS of [2, 0, 1] is [0, 1] at indices 1, 2 (A and B)
+    // - So only C needs to move
+    items = [items[2], items[0], items[1]];
+    rerunEffects();
+
+    // Restore original
+    TemplateInstance.prototype.extractContent = originalExtractContent;
+
+    // Only C should have been extracted
+    expect(extractedKeys).toEqual(['c']);
+  });
+
+  it('should add new items to the list', () => {
+    let items = [
+      { id: 'a', label: 'Item A' },
+      { id: 'b', label: 'Item B' }
+    ];
+
+    const itemTemplate = (item: { id: string; label: string }) => 
+      html(item.id)`<li data-id="${item.id}">${item.label}</li>`;
+
+    const template = html`<ul>${() => items.map(itemTemplate)}</ul>`;
+    const instance = template.instance();
+    container.appendChild(instance.fragment);
+
+    // Capture original nodes
+    const liA = container.querySelector('[data-id="a"]')!;
+    const liB = container.querySelector('[data-id="b"]')!;
+    expect(container.querySelectorAll('li')).toHaveLength(2);
+
+    // Add item C at the end
+    items = [...items, { id: 'c', label: 'Item C' }];
+    rerunEffects();
+
+    const lisAfter = container.querySelectorAll('li');
+    expect(lisAfter).toHaveLength(3);
+    
+    // Original nodes should be preserved
+    expect(lisAfter[0]).toBe(liA);
+    expect(lisAfter[1]).toBe(liB);
+    // New node created for C
+    expect(lisAfter[2].dataset.id).toBe('c');
+  });
+
+  it('should add new items in the middle of the list', () => {
+    let items = [
+      { id: 'a', label: 'Item A' },
+      { id: 'c', label: 'Item C' }
+    ];
+
+    const itemTemplate = (item: { id: string; label: string }) => 
+      html(item.id)`<li data-id="${item.id}">${item.label}</li>`;
+
+    const template = html`<ul>${() => items.map(itemTemplate)}</ul>`;
+    const instance = template.instance();
+    container.appendChild(instance.fragment);
+
+    const liA = container.querySelector('[data-id="a"]')!;
+    const liC = container.querySelector('[data-id="c"]')!;
+
+    // Insert B between A and C
+    items = [items[0], { id: 'b', label: 'Item B' }, items[1]];
+    rerunEffects();
+
+    const lisAfter = container.querySelectorAll('li');
+    expect(lisAfter).toHaveLength(3);
+    expect(lisAfter[0]).toBe(liA);
+    expect(lisAfter[1].dataset.id).toBe('b'); // New node
+    expect(lisAfter[2]).toBe(liC);
+  });
+
+  it('should remove items from the list', () => {
+    let items = [
+      { id: 'a', label: 'Item A' },
+      { id: 'b', label: 'Item B' },
+      { id: 'c', label: 'Item C' }
+    ];
+
+    const itemTemplate = (item: { id: string; label: string }) => 
+      html(item.id)`<li data-id="${item.id}">${item.label}</li>`;
+
+    const template = html`<ul>${() => items.map(itemTemplate)}</ul>`;
+    const instance = template.instance();
+    container.appendChild(instance.fragment);
+
+    const liA = container.querySelector('[data-id="a"]')!;
+    const liC = container.querySelector('[data-id="c"]')!;
+    expect(container.querySelectorAll('li')).toHaveLength(3);
+
+    // Remove B
+    items = [items[0], items[2]];
+    rerunEffects();
+
+    const lisAfter = container.querySelectorAll('li');
+    expect(lisAfter).toHaveLength(2);
+    expect(lisAfter[0]).toBe(liA);
+    expect(lisAfter[1]).toBe(liC);
+    
+    // B should no longer be in the document
+    expect(container.querySelector('[data-id="b"]')).toBeNull();
+  });
+
+  it('should handle clearing the entire list', () => {
+    let items: Array<{ id: string; label: string }> = [
+      { id: 'a', label: 'Item A' },
+      { id: 'b', label: 'Item B' }
+    ];
+
+    const itemTemplate = (item: { id: string; label: string }) => 
+      html(item.id)`<li data-id="${item.id}">${item.label}</li>`;
+
+    const template = html`<ul>${() => items.map(itemTemplate)}</ul>`;
+    const instance = template.instance();
+    container.appendChild(instance.fragment);
+
+    expect(container.querySelectorAll('li')).toHaveLength(2);
+
+    // Clear list
+    items = [];
+    rerunEffects();
+
+    expect(container.querySelectorAll('li')).toHaveLength(0);
+  });
+
+  it('should handle repopulating an empty list', () => {
+    let items: Array<{ id: string; label: string }> = [];
+
+    const itemTemplate = (item: { id: string; label: string }) => 
+      html(item.id)`<li data-id="${item.id}">${item.label}</li>`;
+
+    const template = html`<ul>${() => items.map(itemTemplate)}</ul>`;
+    const instance = template.instance();
+    container.appendChild(instance.fragment);
+
+    expect(container.querySelectorAll('li')).toHaveLength(0);
+
+    // Add items
+    items = [
+      { id: 'a', label: 'Item A' },
+      { id: 'b', label: 'Item B' }
+    ];
+    rerunEffects();
+
+    const lis = container.querySelectorAll('li');
+    expect(lis).toHaveLength(2);
+    expect(lis[0].dataset.id).toBe('a');
+    expect(lis[1].dataset.id).toBe('b');
+  });
+
+  it('should preserve existing items when adding multiple times', () => {
+    // This tests that range tracking remains valid after content is moved.
+    // Previously, extractContent() would collapse the range, causing items
+    // to disappear on subsequent updates.
+    let items: Array<{ id: string; label: string }> = [
+      { id: 'a', label: 'Item A' },
+      { id: 'b', label: 'Item B' },
+      { id: 'c', label: 'Item C' }
+    ];
+
+    const itemTemplate = (item: { id: string; label: string }) => 
+      html(item.id)`<li data-id="${item.id}">${item.label}</li>`;
+
+    const template = html`<ul>${() => items.map(itemTemplate)}</ul>`;
+    const instance = template.instance();
+    container.appendChild(instance.fragment);
+
+    // Capture original nodes
+    const liA = container.querySelector('[data-id="a"]')!;
+    const liB = container.querySelector('[data-id="b"]')!;
+    const liC = container.querySelector('[data-id="c"]')!;
+    expect(container.querySelectorAll('li')).toHaveLength(3);
+
+    // Add first new item
+    items = [...items, { id: 'd', label: 'Item D' }];
+    rerunEffects();
+
+    expect(container.querySelectorAll('li')).toHaveLength(4);
+    expect(container.querySelector('[data-id="a"]')).toBe(liA);
+    expect(container.querySelector('[data-id="b"]')).toBe(liB);
+    expect(container.querySelector('[data-id="c"]')).toBe(liC);
+    expect(container.querySelector('[data-id="d"]')).not.toBeNull();
+
+    // Add second new item - this is where the bug manifested
+    // Range tracking was broken after first reuse, causing items to disappear
+    items = [...items, { id: 'e', label: 'Item E' }];
+    rerunEffects();
+
+    expect(container.querySelectorAll('li')).toHaveLength(5);
+    // All original items should still be present and be the same DOM nodes
+    expect(container.querySelector('[data-id="a"]')).toBe(liA);
+    expect(container.querySelector('[data-id="b"]')).toBe(liB);
+    expect(container.querySelector('[data-id="c"]')).toBe(liC);
+    expect(container.querySelector('[data-id="d"]')).not.toBeNull();
+    expect(container.querySelector('[data-id="e"]')).not.toBeNull();
+
+    // Add third new item to confirm stability
+    items = [...items, { id: 'f', label: 'Item F' }];
+    rerunEffects();
+
+    expect(container.querySelectorAll('li')).toHaveLength(6);
+    expect(container.querySelector('[data-id="a"]')).toBe(liA);
+    expect(container.querySelector('[data-id="b"]')).toBe(liB);
+    expect(container.querySelector('[data-id="c"]')).toBe(liC);
   });
 });
