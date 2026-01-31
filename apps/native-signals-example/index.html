@@ -23,7 +23,10 @@
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
         gap: 2rem;
-        width: min(960px, 100%);
+        width: min(1600px, 100%);
+      }
+      data-table {
+        grid-column: span 2;
       }
     </style>
   </head>
@@ -31,6 +34,8 @@
     <main class="demo-shell">
       <demo-counter></demo-counter>
       <demo-list></demo-list>
+      <todo-list></todo-list>
+      <data-table></data-table>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>
