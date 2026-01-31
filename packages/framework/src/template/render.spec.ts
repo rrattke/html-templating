@@ -1305,7 +1305,11 @@ describe('List Reconciliation - DOM Identity Preservation', () => {
     const originalExtractContent = TemplateInstance.prototype.extractContent;
     TemplateInstance.prototype.extractContent = function() {
       // Try to identify which item this is by checking the DOM
-      const firstElement = this.range.start.nextSibling as Element;
+      // For list items (no marker), start is the first element
+      // For instances with markers, start.nextSibling is the first element
+      const firstElement = (this.range.start.nodeType === Node.COMMENT_NODE 
+        ? this.range.start.nextSibling 
+        : this.range.start) as HTMLElement;
       if (firstElement?.dataset?.id) {
         extractedKeys.push(firstElement.dataset.id);
       }

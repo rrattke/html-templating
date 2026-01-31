@@ -6,9 +6,9 @@
 import { NodeRange } from './dom.js';
 import { Template, getTemplate } from './template.js';
 import { 
-  EventAttributePart, 
+  EventAttributePart,
+  NodePart,
   createParts,
-  KeepInPlace,
   type Part
 } from './parts.js';
 import type { SignalsRuntime } from '../runtime.js';
@@ -25,15 +25,15 @@ import type { SignalsRuntime } from '../runtime.js';
  * ```
  */
 export class StaticBinding {
-  #strings: TemplateStringsArray;
+  #strings: readonly string[];
   #values: unknown[];
 
-  constructor(strings: TemplateStringsArray, values: unknown[]) {
+  constructor(strings: readonly string[], values: unknown[]) {
     this.#strings = strings;
     this.#values = values;
   }
 
-  get strings(): TemplateStringsArray {
+  get strings(): readonly string[] {
     return this.#strings;
   }
 
@@ -123,47 +123,39 @@ function processValue(value: unknown, runtime: SignalsRuntime, parent: TemplateI
 }
 
 /**
- * Process a list value with optimized reconciliation.
- * Only moves items that have actually changed position.
- * Returns KeepInPlace markers for items that shouldn't move.
+ * Checks if a list contains keyed DynamicBindings.
  */
-export function processListValue(value: unknown, runtime: SignalsRuntime, parent: TemplateInstance): unknown {
-  if (!isIterable(value)) {
-    return processValue(value, runtime, parent);
-  }
-  
-  const items = Array.from(value);
-  
-  // Check if we have keyed items
-  const hasKeys = items.some(item => item instanceof DynamicBinding && item.key !== undefined);
-  
-  if (!hasKeys) {
-    // No keys - just process each item
-    return items.map(item => processValue(item, runtime, parent));
-  }
-  
-  return reconcileKeyedList(items, runtime, parent);
+function hasKeyedItems(items: unknown[]): boolean {
+  return items.some(item => item instanceof DynamicBinding && item.key !== undefined);
 }
 
 /**
- * Reconciles a list of keyed items, minimizing DOM mutations.
- * Only extracts items that have actually changed position.
+ * Reconciles a keyed list directly into a NodePart's range.
+ * Minimizes DOM mutations by only moving items that changed position.
  */
-function reconcileKeyedList(items: unknown[], runtime: SignalsRuntime, parent: TemplateInstance): unknown[] {
-  const result: unknown[] = [];
+function reconcileKeyedList(
+  items: unknown[], 
+  runtime: SignalsRuntime, 
+  parent: TemplateInstance,
+  part: NodePart
+): void {
+  const range = part.range;
   const newKeyOrder: unknown[] = [];
   
   // First pass: collect keys and get/create instances
-  const instances: Array<{ item: unknown; instance?: TemplateInstance; reused?: boolean; key?: unknown }> = [];
+  const entries: Array<{ 
+    instance: TemplateInstance; 
+    reused: boolean; 
+    key: unknown;
+  }> = [];
+  
   for (const item of items) {
     if (item instanceof DynamicBinding && item.key !== undefined) {
       const { instance, reused } = parent.getOrCreateChild(item.key, () => 
-        TemplateInstance.create(runtime, item.getTemplate(), item.values)
+        TemplateInstance.create(runtime, item.getTemplate(), item.values, true)
       );
-      instances.push({ item, instance, reused, key: item.key });
+      entries.push({ instance, reused, key: item.key });
       newKeyOrder.push(item.key);
-    } else {
-      instances.push({ item });
     }
   }
   
@@ -173,29 +165,65 @@ function reconcileKeyedList(items: unknown[], runtime: SignalsRuntime, parent: T
   // Compute which items need to move
   const needsMove = computeItemsToMove(oldKeyOrder, newKeyOrder);
   
-  // Second pass: build result, only extracting items that need to move
-  for (const { item, instance, reused, key } of instances) {
-    if (instance) {
-      if (!reused) {
-        // New item - use fragment
-        result.push(instance.fragment);
-      } else if (needsMove.has(key)) {
-        // Reused but needs to move - extract and reinsert
-        result.push(instance.extractContent());
-      } else {
-        // Reused and in same position - keep in place
-        result.push(new KeepInPlace(instance.range));
-      }
+  // Track our insertion point as we reconcile
+  let insertionPoint: Node = range.start;
+  const parentNode = range.start.parentNode!;
+  
+  for (const { instance, reused, key } of entries) {
+    const instanceStart = instance.range.start;
+    const instanceEnd = instance.range.end;
+    
+    if (!reused) {
+      // New item - insert its fragment after insertionPoint
+      const fragment = instance.fragment;
+      parentNode.insertBefore(fragment, insertionPoint.nextSibling);
+      insertionPoint = instanceEnd;
+    } else if (needsMove.has(key)) {
+      // Reused but needs to move - extract and reinsert at current position
+      const fragment = instance.extractContent();
+      parentNode.insertBefore(fragment, insertionPoint.nextSibling);
+      insertionPoint = instanceEnd;
     } else {
-      // Non-keyed item, process recursively
-      result.push(processValue(item, runtime, parent));
+      // Reused and in same relative position
+      // Remove any orphaned nodes between insertionPoint and this item
+      removeNodesBetween(insertionPoint, instanceStart);
+      // Advance past this item
+      insertionPoint = instanceEnd;
     }
+  }
+  
+  // Remove any remaining nodes after the last item up to range.end
+  const oldEnd = range.end;
+  if (insertionPoint !== oldEnd) {
+    removeNodesBetween(insertionPoint, null);
+    // But stop at oldEnd
+    let node = insertionPoint.nextSibling;
+    while (node) {
+      const next = node.nextSibling;
+      const isEnd = node === oldEnd;
+      node.remove();
+      if (isEnd) break;
+      node = next;
+    }
+  }
+  
+  // Update range end to point to the last item
+  if (entries.length > 0) {1
+    range.setEnd(entries[entries.length - 1].instance.range.end);
+  } else {
+    range.setEnd(range.start);
   }
   
   // Update the parent's child order
   parent.setChildKeyOrder(newKeyOrder);
-  
-  return result;
+}
+
+/**
+ * Removes all nodes between start (exclusive) and end (exclusive).
+ */
+function removeNodesBetween(start: Node, end: Node | null): void {
+  if (!end || start.nextSibling === end) return;
+  new NodeRange(start, end.previousSibling!).deleteContents();
 }
 
 /**
@@ -321,15 +349,19 @@ export class TemplateInstance {
 
   /**
    * Extracts this instance's DOM nodes from the document.
-   * Returns a DocumentFragment containing the nodes (including the start marker).
+   * Returns a DocumentFragment containing the nodes.
+   * For instances with markers, includes the marker. For list items, only content.
    * The range remains valid and will track the new location after reinsertion.
    */
   extractContent(): DocumentFragment {
     const fragment = document.createDocumentFragment();
     
-    // Include the start marker so the range stays valid after reinsertion
-    let node: Node | null = this.#range.start;
+    const start = this.#range.start;
     const end = this.#range.end;
+    
+    // For list items (no marker), extract from start to end inclusive
+    // For instances with markers, extract from marker to end inclusive
+    let node: Node | null = start;
     
     while (node) {
       const next: Node | null = node.nextSibling;
@@ -374,8 +406,9 @@ export class TemplateInstance {
 
   /**
    * Creates a TemplateInstance from a template and values.
+   * @param skipMarker If true, don't create a start marker (used for list items)
    */
-  static create(runtime: SignalsRuntime, template: Template, values: unknown[]): TemplateInstance {
+  static create(runtime: SignalsRuntime, template: Template, values: unknown[], skipMarker = false): TemplateInstance {
     if (template.descriptors.length !== values.length) {
       throw new Error('Template part mismatch.');
     }
@@ -385,9 +418,16 @@ export class TemplateInstance {
     const disposers: Array<() => void> = [];
 
     // Create start marker and range to track where our content is
-    const startMarker = document.createComment('');
-    fragment.insertBefore(startMarker, fragment.firstChild);
-    const range = new NodeRange(startMarker, fragment.lastChild ?? startMarker);
+    // List items skip marker creation to reduce DOM overhead
+    let range: NodeRange;
+    if (skipMarker) {
+      const firstChild = fragment.firstChild;
+      range = new NodeRange(firstChild ?? document.createComment(''), fragment.lastChild ?? firstChild ?? document.createComment(''));
+    } else {
+      const startMarker = document.createComment('');
+      fragment.insertBefore(startMarker, fragment.firstChild);
+      range = new NodeRange(startMarker, fragment.lastChild ?? startMarker);
+    }
 
     // Create instance first so children can be tracked
     const instance = new TemplateInstance(fragment, parts, () => {
@@ -406,8 +446,18 @@ export class TemplateInstance {
         else {
           const dispose = runtime.effect(() => {
             const result = value();
-            // Use processListValue for optimized list reconciliation
-            const processed = processListValue(result, runtime, instance);
+            
+            // For NodeParts with keyed lists, use optimized reconciliation
+            if (part instanceof NodePart && isIterable(result)) {
+              const items = Array.from(result);
+              if (hasKeyedItems(items)) {
+                reconcileKeyedList(items, runtime, instance, part);
+                return;
+              }
+            }
+            
+            // Standard processing for non-keyed values
+            const processed = processValue(result, runtime, instance);
             part.setValue(processed);
           });
           disposers.push(dispose);
@@ -437,7 +487,7 @@ export class DynamicBinding extends StaticBinding {
   #runtime: SignalsRuntime;
   key?: unknown;
 
-  constructor(strings: TemplateStringsArray, values: unknown[], runtime: SignalsRuntime) {
+  constructor(strings: readonly string[], values: unknown[], runtime: SignalsRuntime) {
     super(strings, values);
     this.#runtime = runtime;
   }

@@ -82,20 +82,8 @@ export class TextTemplate {
 }
 
 /**
- * Marker that tells NodePart to skip over existing DOM nodes.
- * Used for list items that don't need to move.
- */
-export class KeepInPlace {
-  readonly range: NodeRange;
-  constructor(range: NodeRange) {
-    this.range = range;
-  }
-}
-
-/**
  * NodePart: applies values to a DOM location marked by a comment.
- * Stateless - just applies values without tracking or reconciliation.
- * For keyed reconciliation, use SlotReconciler at the render level.
+ * Converts values to DOM nodes and delegates to NodeRange for insertion.
  */
 export class NodePart {
   #range: NodeRange;
@@ -109,98 +97,10 @@ export class NodePart {
   }
 
   setValue(value: unknown): void {
-    // Check if this is a list with KeepInPlace markers
-    if (isIterable(value)) {
-      const items = Array.from(value);
-      const hasKeepInPlace = items.some(item => item instanceof KeepInPlace);
-      
-      if (hasKeepInPlace) {
-        this.#setListValue(items);
-        return;
-      }
-    }
-    
     this.#range.deleteContents();
     const node = this.#valueToNode(value);
     if (node) {
       this.#range.insertNode(node);
-    }
-  }
-
-  /**
-   * Sets a list value with KeepInPlace markers for optimized reconciliation.
-   * Items marked as KeepInPlace are left in their current DOM position.
-   * Removes any nodes between kept items that shouldn't be there.
-   */
-  #setListValue(items: unknown[]): void {
-    const parent = this.#range.start.parentNode;
-    if (!parent) {
-      throw new Error('NodePart marker is not attached to DOM');
-    }
-
-    const oldEnd = this.#range.end;
-    
-    // Collect nodes to keep and track positions
-    let insertionPoint: Node = this.#range.start;
-    let lastEnd: Node = this.#range.start;
-    
-    for (const item of items) {
-      if (item instanceof KeepInPlace) {
-        // Remove any nodes between insertionPoint and this item's start
-        // These are nodes that were removed from the list
-        this.#removeNodesBetween(insertionPoint, item.range.start);
-        
-        // Update position to after this item
-        lastEnd = item.range.end;
-        insertionPoint = lastEnd;
-      } else {
-        // This is new content - insert after the current insertion point
-        const node = this.#valueToNode(item);
-        if (node) {
-          // Insert after insertionPoint
-          const nextSibling = insertionPoint.nextSibling;
-          if (node instanceof DocumentFragment) {
-            const nodes = Array.from(node.childNodes);
-            parent.insertBefore(node, nextSibling);
-            if (nodes.length > 0) {
-              lastEnd = nodes[nodes.length - 1];
-              insertionPoint = lastEnd;
-            }
-          } else {
-            parent.insertBefore(node, nextSibling);
-            lastEnd = node;
-            insertionPoint = node;
-          }
-        }
-      }
-    }
-    
-    // Remove any remaining nodes after lastEnd up to oldEnd
-    // These are items that were removed from the end of the list
-    if (lastEnd !== oldEnd) {
-      let node = lastEnd.nextSibling;
-      while (node) {
-        const next = node.nextSibling;
-        const isOldEnd = node === oldEnd;
-        node.remove();
-        if (isOldEnd) break;
-        node = next;
-      }
-    }
-    
-    // Update our range's end
-    this.#range.setEnd(lastEnd);
-  }
-
-  /**
-   * Removes all nodes between start (exclusive) and end (exclusive).
-   */
-  #removeNodesBetween(start: Node, end: Node): void {
-    let node = start.nextSibling;
-    while (node && node !== end) {
-      const next = node.nextSibling;
-      node.remove();
-      node = next;
     }
   }
 
@@ -226,6 +126,13 @@ export class NodePart {
     }
     return this.#range.ownerDocument.createTextNode(String(value));
   }
+}
+
+function isIterable(value: unknown): value is Iterable<unknown> {
+  if (typeof value === 'string') {
+    return false;
+  }
+  return value != null && typeof (value as Iterable<unknown>)[Symbol.iterator] === 'function';
 }
 
 /**
@@ -371,13 +278,6 @@ export class TextContentPart {
     }
     this.#element.textContent = String(value ?? '');
   }
-}
-
-function isIterable(value: unknown): value is Iterable<unknown> {
-  if (typeof value === 'string') {
-    return false;
-  }
-  return value != null && typeof (value as Iterable<unknown>)[Symbol.iterator] === 'function';
 }
 
 // =============================================================================

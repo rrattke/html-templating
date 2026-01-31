@@ -58,7 +58,7 @@ interface TemplateDescriptor {
 // Template Class and Caching
 // =============================================================================
 
-const templateCache = new WeakMap<TemplateStringsArray, Template>();
+const templateCache = new WeakMap<readonly string[], Template>();
 
 /**
  * Compiled template - cached and immutable.
@@ -85,7 +85,7 @@ export class Template {
  * Retrieves or creates a cached Template for the given template strings.
  * Uses WeakMap so templates can be garbage collected when modules unload.
  */
-export function getTemplate(strings: TemplateStringsArray): Template {
+export function getTemplate(strings: readonly string[]): Template {
   let template = templateCache.get(strings);
   if (!template) {
     const { template: element, descriptors } = createTemplateDescriptor(strings);

@@ -39,22 +39,22 @@ export function resolvePath(root: Node, path: number[]): Node {
 
 /**
  * Tracks a contiguous sequence of DOM nodes.
- * Uses an exclusive start marker (Comment) and inclusive end node.
+ * Uses an exclusive start marker (Comment or first content node) and inclusive end node.
  * 
  * Range states:
  * - Empty/collapsed: end === start (no content between markers)
  * - Non-empty: end is the last content node after start
  */
 export class NodeRange {
-  #start: Comment;
+  #start: Node;
   #end: Node;
 
   /**
    * Creates a new NodeRange.
-   * @param start The start marker comment node
+   * @param start The start marker (Comment for template parts, or first content node for list items)
    * @param end The end node of the range (defaults to start, creating an empty/collapsed range)
    */
-  constructor(start: Comment, end?: Node) {
+  constructor(start: Node, end?: Node) {
     this.#start = start;
     this.#end = end ?? start;
   }
@@ -65,7 +65,7 @@ export class NodeRange {
    * Returns an empty fragment if the range is already empty.
    */
   extractContents(): DocumentFragment {
-    const fragment = this.#start.ownerDocument.createDocumentFragment();
+    const fragment = this.#start.ownerDocument!.createDocumentFragment();
     
     if (this.collapsed()) {
       return fragment;
@@ -92,7 +92,7 @@ export class NodeRange {
    * Returns an empty fragment if the range is empty.
    */
   cloneContents(): DocumentFragment {
-    const fragment = this.#start.ownerDocument.createDocumentFragment();
+    const fragment = this.ownerDocument.createDocumentFragment();
     
     if (this.collapsed()) {
       return fragment;
@@ -173,7 +173,7 @@ export class NodeRange {
     return this.#end === this.#start;
   }
 
-  get start(): Comment {
+  get start(): Node {
     return this.#start;
   }
 
@@ -182,6 +182,6 @@ export class NodeRange {
   }
 
   get ownerDocument(): Document {
-    return this.#start.ownerDocument;
+    return this.#start.ownerDocument!;
   }
 }
