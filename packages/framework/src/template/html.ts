@@ -8,6 +8,8 @@ export { resolvePath };
 
 export type PartDescriptor = NodePartDescriptor | AttributePartDescriptor | TextContentPartDescriptor | TextTemplatePartDescriptor;
 
+export type Descriptor = NodePartDescriptor | AttributePartDescriptor | TextContentPartDescriptor | TextTemplatePartDescriptor;
+
 export interface TemplateDescriptor {
   template: HTMLTemplateElement;
   descriptors: PartDescriptor[];

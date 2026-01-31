@@ -3,7 +3,7 @@
  * Layer 3: Manages template instances, bindings, and reconciliation.
  */
 
-import type { NodePartDescriptor, AttributePartDescriptor, TextContentPartDescriptor, TextTemplatePartDescriptor } from './html.js';
+import type { NodePartDescriptor, AttributePartDescriptor, TextContentPartDescriptor, TextTemplatePartDescriptor, Descriptor } from './html.js';
 import { resolvePath } from './html.js';
 import { NodeRange } from './dom.js';
 import { Template, getTemplate } from './template.js';
@@ -18,13 +18,10 @@ import {
   TextTemplate, 
   ATTRIBUTE_BINDING, 
   PROPERTY_BINDING, 
-  BOOLEAN_ATTRIBUTE_BINDING 
+  BOOLEAN_ATTRIBUTE_BINDING,
+  type Part
 } from './parts.js';
 import type { SignalsRuntime } from '../runtime.js';
-
-export type Part = NodePart | StandardAttributePart | PropertyAttributePart | BooleanAttributePart | EventAttributePart | TemplateAttributePart | TextContentPart;
-
-type Descriptor = NodePartDescriptor | AttributePartDescriptor | TextContentPartDescriptor | TextTemplatePartDescriptor;
 
 /**
  * Process a value by instantiating any TemplateBindings.

@@ -4,6 +4,8 @@ import type { SignalsRuntime } from '../runtime.js';
 import { NodeRange } from './dom.js';
 import { Template } from './template.js';
 
+export type Part = NodePart | StandardAttributePart | PropertyAttributePart | BooleanAttributePart | EventAttributePart | TemplateAttributePart | TextContentPart;
+
 export { NodeRange, Template };
 
 // Backward compatibility alias - will be removed after full migration
