@@ -168,6 +168,7 @@ function reconcileKeyedList(
   // Track our insertion point as we reconcile
   let insertionPoint: Node = range.start;
   const parentNode = range.start.parentNode!;
+  const oldRangeEnd = range.end; // Capture old end before modifications
   
   for (const { instance, reused, key } of entries) {
     const instanceStart = instance.range.start;
@@ -186,26 +187,15 @@ function reconcileKeyedList(
     } else {
       // Reused and in same relative position
       // Remove any orphaned nodes between insertionPoint and this item
-      removeNodesBetween(insertionPoint, instanceStart);
+      NodeRange.deleteContents(insertionPoint, instanceStart);
       // Advance past this item
       insertionPoint = instanceEnd;
     }
   }
   
-  // Remove any remaining nodes after the last item up to range.end
-  const oldEnd = range.end;
-  if (insertionPoint !== oldEnd) {
-    removeNodesBetween(insertionPoint, null);
-    // But stop at oldEnd
-    let node = insertionPoint.nextSibling;
-    while (node) {
-      const next = node.nextSibling;
-      const isEnd = node === oldEnd;
-      node.remove();
-      if (isEnd) break;
-      node = next;
-    }
-  }
+  // Remove any remaining nodes after the last item up to old range end
+  // If insertionPoint === oldRangeEnd, this is a collapsed range (no-op)
+  NodeRange.deleteContents(insertionPoint, oldRangeEnd);
   
   // Update range end to point to the last item
   if (entries.length > 0) {1
@@ -216,14 +206,6 @@ function reconcileKeyedList(
   
   // Update the parent's child order
   parent.setChildKeyOrder(newKeyOrder);
-}
-
-/**
- * Removes all nodes between start (exclusive) and end (exclusive).
- */
-function removeNodesBetween(start: Node, end: Node | null): void {
-  if (!end || start.nextSibling === end) return;
-  new NodeRange(start, end.previousSibling!).deleteContents();
 }
 
 /**

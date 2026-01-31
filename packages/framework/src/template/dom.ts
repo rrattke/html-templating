@@ -184,4 +184,21 @@ export class NodeRange {
   get ownerDocument(): Document {
     return this.#start.ownerDocument!;
   }
+
+  /**
+   * Static helper: deletes all nodes between start and end, excluding both boundaries.
+   * This is different from the instance method which deletes from start.nextSibling to end inclusive.
+   * Use this for removing orphaned nodes between two boundaries you want to preserve.
+   * No-op if start === end or if start.nextSibling === end.
+   */
+  static deleteContents(start: Node, end: Node): void {
+    if (start === end || start.nextSibling === end) return;
+    
+    let node = start.nextSibling;
+    while (node && node !== end) {
+      const next = node.nextSibling;
+      node.remove();
+      node = next;
+    }
+  }
 }
