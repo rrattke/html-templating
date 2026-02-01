@@ -72,6 +72,199 @@ export class StaticBinding {
 }
 
 /**
+ * Dynamic template binding - extends StaticBinding with runtime and key.
+ * Used for reactive templates that update when signals change.
+ * 
+ * @example
+ * ```ts
+ * const html = DynamicBinding.with(runtime);
+ * const page = html`<div>${() => count()}</div>`;
+ * document.body.appendChild(page.instance().fragment);
+ * ```
+ */
+export class DynamicBinding extends StaticBinding {
+  #runtime: SignalsRuntime;
+  key?: unknown;
+
+  constructor(strings: readonly string[], values: unknown[], runtime: SignalsRuntime) {
+    super(strings, values);
+    this.#runtime = runtime;
+  }
+
+  /**
+   * Creates an html`` tag function bound to a specific runtime.
+   * Supports both direct use (html`...`) and keyed use (html(key)`...`).
+   */
+  static with(runtime: SignalsRuntime): ((strings: TemplateStringsArray, ...values: unknown[]) => DynamicBinding) & ((key?: unknown) => (strings: TemplateStringsArray, ...values: unknown[]) => DynamicBinding) {
+    const htmlFunction = ((stringsOrKey?: TemplateStringsArray | unknown, ...values: unknown[]) => {
+      // If called as a template tag: html``
+      if (stringsOrKey && typeof stringsOrKey === 'object' && 'raw' in stringsOrKey) {
+        return new DynamicBinding(stringsOrKey as TemplateStringsArray, values, runtime);
+      }
+      // If called as a function: html(key)
+      const key = stringsOrKey;
+      return (strings: TemplateStringsArray, ...values: unknown[]) => {
+        const binding = new DynamicBinding(strings, values, runtime);
+        if (key !== undefined) {
+          binding.key = key;
+        }
+        return binding;
+      };
+    }) as ((strings: TemplateStringsArray, ...values: unknown[]) => DynamicBinding) & ((key?: unknown) => (strings: TemplateStringsArray, ...values: unknown[]) => DynamicBinding);
+
+    return htmlFunction;
+  }
+
+  get runtime(): SignalsRuntime {
+    return this.#runtime;
+  }
+
+  setKey(keyValue: unknown): this {
+    this.key = keyValue;
+    return this;
+  }
+
+  instance() {
+    return TemplateInstance.create(this.#runtime, this.getTemplate(), this.values);
+  }
+}
+
+/**
+ * Realized template in the DOM.
+ * Has behavior: dispose() cleans up effects and event listeners.
+ * Tracks child instances for reconciliation.
+ */
+export class TemplateInstance {
+  readonly fragment: DocumentFragment;
+  readonly parts: Part[];
+  readonly #dispose: () => void;
+  
+  // DOM range tracking - where our content lives in the document
+  #range: NodeRange;
+
+  constructor(fragment: DocumentFragment, parts: Part[], dispose: () => void, range: NodeRange) {
+    this.fragment = fragment;
+    this.parts = parts;
+    this.#dispose = dispose;
+    this.#range = range;
+  }
+
+  get range(): NodeRange {
+    return this.#range;
+  }
+
+  /**
+   * Extracts this instance's DOM nodes from the document.
+   * Returns a DocumentFragment containing the nodes.
+   * For instances with markers, includes the marker. For list items, only content.
+   * The range remains valid and will track the new location after reinsertion.
+   */
+  extractContent(): DocumentFragment {
+    return NodeRange.extractInclusive(this.#range.start, this.#range.end);
+  }
+
+  /**
+   * Disposes all reactive effects and event listeners.
+   */
+  dispose(): void {
+    this.#dispose();
+  }
+
+  /**
+   * Creates a TemplateInstance from a template and values.
+   * @param skipMarker If true, don't create a start marker (used for list items)
+   */
+  static create(runtime: SignalsRuntime, template: Template, values: unknown[], skipMarker = false): TemplateInstance {
+    if (template.descriptors.length !== values.length) {
+      throw new Error('Template part mismatch.');
+    }
+
+    const fragment = template.cloneFragment();
+    const parts = createParts(template.descriptors, fragment);
+    const disposers: Array<() => void> = [];
+
+    // Create start marker and range to track where our content is
+    // List items skip marker creation to reduce DOM overhead
+    let range: NodeRange;
+    if (skipMarker) {
+      // List items always have content from the template
+      range = new NodeRange(fragment.firstChild!, fragment.lastChild!);
+    } else {
+      // Regular instances: marker as start, last child as end (or marker if empty)
+      const startMarker = document.createComment('');
+      fragment.insertBefore(startMarker, fragment.firstChild);
+      range = new NodeRange(startMarker, fragment.lastChild ?? startMarker);
+    }
+
+    // Create instance first
+    const instance = new TemplateInstance(fragment, parts, () => {
+      for (const disposer of disposers) {
+        disposer();
+      }
+    }, range);
+
+    parts.forEach((part, index) => {
+      const value = values[index];
+      if (typeof value === 'function') {
+        if (part instanceof EventAttributePart) {
+          part.setValue(value);
+          disposers.push(() => part.dispose());
+        }
+        else {
+          // Keyed list cache for this part
+          const keyedState = {
+            cache: new Map<unknown, TemplateInstance>(),
+            order: [] as unknown[]
+          };
+          
+          // Dispose cache when this part (and instance) is disposed
+          disposers.push(() => {
+            keyedState.cache.forEach(i => i.dispose());
+            keyedState.cache.clear();
+          });
+
+          const dispose = runtime.effect(() => {
+            const result = value();
+            
+            // For NodeParts with keyed lists, use optimized reconciliation
+            if (part instanceof NodePart && isIterable(result)) {
+              const items = Array.from(result);
+              if (hasKeyedItems(items)) {
+                reconcileKeyedList(items, runtime, part, keyedState);
+                return;
+              }
+            }
+            
+            // If switching away from keyed list, clear cache
+            if (keyedState.cache.size > 0) {
+              keyedState.cache.forEach(i => i.dispose());
+              keyedState.cache.clear();
+              keyedState.order = [];
+            }
+            
+            // Standard processing for non-keyed values
+            const processed = processValue(result, runtime, (cleanup) => {
+                // Register cleanup for created instances
+                // We use runtime.onCleanup so it runs when this effect re-runs
+                runtime.onCleanup(cleanup);
+            });
+            part.setValue(processed);
+          });
+          disposers.push(dispose);
+        }
+      } else {
+        // Static initial value
+        // We register cleanup to the instance's disposers list because there is no effect re-run
+        const processed = processValue(value, runtime, (cleanup) => disposers.push(cleanup));
+        part.setValue(processed);
+      }
+    });
+
+    return instance;
+  }
+}
+
+/**
  * Process a value for static rendering by instantiating any StaticBindings.
  * Unlike processValue, this doesn't track instances for disposal.
  */
@@ -92,19 +285,17 @@ function processValueStatic(value: unknown): unknown {
 
 /**
  * Process a value by instantiating any DynamicBindings.
- * Child instances are tracked on the parent for reconciliation.
+ * Registers disposal of created instances.
  */
-function processValue(value: unknown, runtime: SignalsRuntime, parent: TemplateInstance): unknown {
-  // Handle DynamicBinding by instantiating it (or reusing existing)
+function processValue(
+  value: unknown, 
+  runtime: SignalsRuntime, 
+  registerCleanup: (cleanup: () => void) => void
+): unknown {
+  // Handle DynamicBinding by instantiating it
   if (value instanceof DynamicBinding) {
-    const { instance, reused } = parent.getOrCreateChild(value.key, () => 
-      TemplateInstance.create(runtime, value.getTemplate(), value.values)
-    );
-    
-    if (reused) {
-      // Extract DOM nodes from their current location for reinsertion
-      return instance.extractContent();
-    }
+    const instance = TemplateInstance.create(runtime, value.getTemplate(), value.values);
+    registerCleanup(() => instance.dispose());
     return instance.fragment;
   }
   
@@ -115,18 +306,11 @@ function processValue(value: unknown, runtime: SignalsRuntime, parent: TemplateI
   
   // Handle arrays/iterables recursively
   if (isIterable(value)) {
-    return Array.from(value).map(item => processValue(item, runtime, parent));
+    return Array.from(value).map(item => processValue(item, runtime, registerCleanup));
   }
   
   // Pass through everything else (nodes, primitives, null, etc.)
   return value;
-}
-
-/**
- * Checks if a list contains keyed DynamicBindings.
- */
-function hasKeyedItems(items: unknown[]): boolean {
-  return items.some(item => item instanceof DynamicBinding && item.key !== undefined);
 }
 
 /**
@@ -136,14 +320,13 @@ function hasKeyedItems(items: unknown[]): boolean {
 function reconcileKeyedList(
   items: unknown[], 
   runtime: SignalsRuntime, 
-  parent: TemplateInstance,
-  part: NodePart
+  part: NodePart,
+  state: { cache: Map<unknown, TemplateInstance>, order: unknown[] }
 ): void {
   const range = part.range;
   const newKeyOrder: unknown[] = [];
   
   // Reference node to know where the list ends in the DOM
-  // We'll remove any trailing garbage up to this node
   const endAnchor = range.end.nextSibling;
   
   // First pass: collect keys and get/create instances
@@ -153,18 +336,39 @@ function reconcileKeyedList(
     key: unknown;
   }> = [];
   
+  const currentKeys = new Set<unknown>();
+
   for (const item of items) {
     if (item instanceof DynamicBinding && item.key !== undefined) {
-      const { instance, reused } = parent.getOrCreateChild(item.key, () => 
-        TemplateInstance.create(runtime, item.getTemplate(), item.values, true)
-      );
+      currentKeys.add(item.key);
+      
+      let instance = state.cache.get(item.key);
+      let reused = false;
+      
+      if (instance) {
+        reused = true;
+      } else {
+        // Create new instance without registering a disposer to the parent list
+        // Disposal is handled by the cache cleanup or item removal logic
+        instance = TemplateInstance.create(runtime, item.getTemplate(), item.values, true);
+        state.cache.set(item.key, instance);
+      }
+
       entries.push({ instance, reused, key: item.key });
       newKeyOrder.push(item.key);
     }
   }
+
+  // Detect and dispose removed items
+  for (const [key, instance] of state.cache) {
+    if (!currentKeys.has(key)) {
+      instance.dispose();
+      state.cache.delete(key);
+    }
+  }
   
   // Get the previous order of keys
-  const oldKeyOrder = parent.getChildKeyOrder();
+  const oldKeyOrder = state.order;
   
   // Compute which items need to move
   const needsMove = computeItemsToMove(oldKeyOrder, newKeyOrder);
@@ -186,7 +390,6 @@ function reconcileKeyedList(
     const instanceEnd = instance.range.end;
     
     // Clean up garbage nodes before the next item
-    // We only do this if the item is reused and stable (not moved)
     if (reused && !needsMove.has(key)) {
       let node = insertionPoint.nextSibling;
       while (node && node !== instanceStart && node !== endAnchor) {
@@ -197,16 +400,13 @@ function reconcileKeyedList(
     }
 
     if (!reused) {
-      // New item - insert its fragment after insertionPoint
       parentNode.insertBefore(instance.fragment, insertionPoint.nextSibling);
       insertionPoint = instanceEnd;
     } else if (needsMove.has(key)) {
-      // Reused but moved - insert extracted fragment
       const fragment = movedFragments.get(key)!;
       parentNode.insertBefore(fragment, insertionPoint.nextSibling);
       insertionPoint = instanceEnd;
     } else {
-      // Reused and stable - we've already cleaned up before it
       insertionPoint = instanceEnd;
     }
   }
@@ -219,15 +419,15 @@ function reconcileKeyedList(
     node = next;
   }
   
-  // Update range end to point to the last item
+  // Update range end
   if (entries.length > 0) {
     range.setEnd(entries[entries.length - 1].instance.range.end);
   } else {
     range.setEnd(range.start);
   }
   
-  // Update the parent's child order
-  parent.setChildKeyOrder(newKeyOrder);
+  // Update state order for next run
+  state.order = newKeyOrder;
 }
 
 /**
@@ -303,218 +503,16 @@ function longestIncreasingSubsequence(arr: number[]): number[] {
   return result.reverse();
 }
 
+/**
+ * Checks if a list contains keyed DynamicBindings.
+ */
+function hasKeyedItems(items: unknown[]): boolean {
+  return items.some(item => item instanceof DynamicBinding && item.key !== undefined);
+}
+
 function isIterable(value: unknown): value is Iterable<unknown> {
   if (typeof value === 'string') {
     return false;
   }
   return value != null && typeof (value as Iterable<unknown>)[Symbol.iterator] === 'function';
-}
-
-/**
- * Realized template in the DOM.
- * Has behavior: dispose() cleans up effects and event listeners.
- * Tracks child instances for reconciliation.
- */
-export class TemplateInstance {
-  readonly fragment: DocumentFragment;
-  readonly parts: Part[];
-  readonly #dispose: () => void;
-  
-  // DOM range tracking - where our content lives in the document
-  #range: NodeRange;
-  
-  // Child instance tracking for reconciliation
-  #children: TemplateInstance[] = [];
-  #childrenByKey = new Map<unknown, TemplateInstance>();
-  #childKeyOrder: unknown[] = [];
-
-  constructor(fragment: DocumentFragment, parts: Part[], dispose: () => void, range: NodeRange) {
-    this.fragment = fragment;
-    this.parts = parts;
-    this.#dispose = dispose;
-    this.#range = range;
-  }
-
-  get children(): readonly TemplateInstance[] {
-    return this.#children;
-  }
-
-  get range(): NodeRange {
-    return this.#range;
-  }
-
-  getChildKeyOrder(): unknown[] {
-    return this.#childKeyOrder;
-  }
-
-  setChildKeyOrder(order: unknown[]): void {
-    this.#childKeyOrder = order;
-  }
-
-  /**
-   * Extracts this instance's DOM nodes from the document.
-   * Returns a DocumentFragment containing the nodes.
-   * For instances with markers, includes the marker. For list items, only content.
-   * The range remains valid and will track the new location after reinsertion.
-   */
-  extractContent(): DocumentFragment {
-    return NodeRange.extractInclusive(this.#range.start, this.#range.end);
-  }
-
-  /**
-   * Disposes all reactive effects, event listeners, and child instances.
-   */
-  dispose(): void {
-    for (const child of this.#children) {
-      child.dispose();
-    }
-    this.#children = [];
-    this.#childrenByKey.clear();
-    this.#dispose();
-  }
-
-  /**
-   * Gets or creates a child instance for a keyed binding.
-   * If an instance with the same key exists, it's reused and its DOM content extracted.
-   * Returns the instance and whether it was reused.
-   */
-  getOrCreateChild(key: unknown, create: () => TemplateInstance): { instance: TemplateInstance; reused: boolean } {
-    if (key !== undefined && this.#childrenByKey.has(key)) {
-      const instance = this.#childrenByKey.get(key)!;
-      return { instance, reused: true };
-    }
-    
-    const instance = create();
-    this.#children.push(instance);
-    if (key !== undefined) {
-      this.#childrenByKey.set(key, instance);
-    }
-    return { instance, reused: false };
-  }
-
-  /**
-   * Creates a TemplateInstance from a template and values.
-   * @param skipMarker If true, don't create a start marker (used for list items)
-   */
-  static create(runtime: SignalsRuntime, template: Template, values: unknown[], skipMarker = false): TemplateInstance {
-    if (template.descriptors.length !== values.length) {
-      throw new Error('Template part mismatch.');
-    }
-
-    const fragment = template.cloneFragment();
-    const parts = createParts(template.descriptors, fragment);
-    const disposers: Array<() => void> = [];
-
-    // Create start marker and range to track where our content is
-    // List items skip marker creation to reduce DOM overhead
-    let range: NodeRange;
-    if (skipMarker) {
-      // List items always have content from the template
-      range = new NodeRange(fragment.firstChild!, fragment.lastChild!);
-    } else {
-      // Regular instances: marker as start, last child as end (or marker if empty)
-      const startMarker = document.createComment('');
-      fragment.insertBefore(startMarker, fragment.firstChild);
-      range = new NodeRange(startMarker, fragment.lastChild ?? startMarker);
-    }
-
-    // Create instance first so children can be tracked
-    const instance = new TemplateInstance(fragment, parts, () => {
-      for (const disposer of disposers) {
-        disposer();
-      }
-    }, range);
-
-    parts.forEach((part, index) => {
-      const value = values[index];
-      if (typeof value === 'function') {
-        if (part instanceof EventAttributePart) {
-          part.setValue(value);
-          disposers.push(() => part.dispose());
-        }
-        else {
-          const dispose = runtime.effect(() => {
-            const result = value();
-            
-            // For NodeParts with keyed lists, use optimized reconciliation
-            if (part instanceof NodePart && isIterable(result)) {
-              const items = Array.from(result);
-              if (hasKeyedItems(items)) {
-                reconcileKeyedList(items, runtime, instance, part);
-                return;
-              }
-            }
-            
-            // Standard processing for non-keyed values
-            const processed = processValue(result, runtime, instance);
-            part.setValue(processed);
-          });
-          disposers.push(dispose);
-        }
-      } else {
-        const processed = processValue(value, runtime, instance);
-        part.setValue(processed);
-      }
-    });
-
-    return instance;
-  }
-}
-
-/**
- * Dynamic template binding - extends StaticBinding with runtime and key.
- * Used for reactive templates that update when signals change.
- * 
- * @example
- * ```ts
- * const html = DynamicBinding.with(runtime);
- * const page = html`<div>${() => count()}</div>`;
- * document.body.appendChild(page.instance().fragment);
- * ```
- */
-export class DynamicBinding extends StaticBinding {
-  #runtime: SignalsRuntime;
-  key?: unknown;
-
-  constructor(strings: readonly string[], values: unknown[], runtime: SignalsRuntime) {
-    super(strings, values);
-    this.#runtime = runtime;
-  }
-
-  /**
-   * Creates an html`` tag function bound to a specific runtime.
-   * Supports both direct use (html`...`) and keyed use (html(key)`...`).
-   */
-  static with(runtime: SignalsRuntime): ((strings: TemplateStringsArray, ...values: unknown[]) => DynamicBinding) & ((key?: unknown) => (strings: TemplateStringsArray, ...values: unknown[]) => DynamicBinding) {
-    const htmlFunction = ((stringsOrKey?: TemplateStringsArray | unknown, ...values: unknown[]) => {
-      // If called as a template tag: html``
-      if (stringsOrKey && typeof stringsOrKey === 'object' && 'raw' in stringsOrKey) {
-        return new DynamicBinding(stringsOrKey as TemplateStringsArray, values, runtime);
-      }
-      // If called as a function: html(key)
-      const key = stringsOrKey;
-      return (strings: TemplateStringsArray, ...values: unknown[]) => {
-        const binding = new DynamicBinding(strings, values, runtime);
-        if (key !== undefined) {
-          binding.key = key;
-        }
-        return binding;
-      };
-    }) as ((strings: TemplateStringsArray, ...values: unknown[]) => DynamicBinding) & ((key?: unknown) => (strings: TemplateStringsArray, ...values: unknown[]) => DynamicBinding);
-
-    return htmlFunction;
-  }
-
-  get runtime(): SignalsRuntime {
-    return this.#runtime;
-  }
-
-  setKey(keyValue: unknown): this {
-    this.key = keyValue;
-    return this;
-  }
-
-  instance() {
-    return TemplateInstance.create(this.#runtime, this.getTemplate(), this.values);
-  }
 }

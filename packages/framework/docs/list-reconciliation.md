@@ -26,12 +26,12 @@ The `html(item.id)` syntax creates a keyed template - the key allows the reconci
 
 ### Template Instance Tracking
 
-Each keyed item gets its own `TemplateInstance` that is:
-- **Stored by key** in the parent instance's `#childrenByKey` map
+Each keyed item gets its own `TemplateInstance`. Unlike non-keyed lists, keyed instances are:
+- **Stored by key** in a localized cache within the render effect (not on the parent instance)
 - **Reused** across updates if the key still exists
 - **Created without a marker node** (using `skipMarker=true`) to reduce DOM overhead
 
-List items use their first content node as the range start instead of creating an extra Comment marker node.
+List items use their first content node as the range start instead of creating an extra Comment marker node. This localized tracking prevents key collisions between sibling lists and avoids memory leaks from retained children.
 
 ## Algorithm Phases
 
@@ -39,17 +39,20 @@ List items use their first content node as the range start instead of creating a
 
 For each item in the new list:
 1. Extract its key from the `DynamicBinding`
-2. Look up existing instance by key in `parent.#childrenByKey`
-3. If found, reuse it; otherwise create new instance
+2. Look up existing instance by key in the local `state.cache`
+3. If found, reuse it; otherwise create new instance and add to cache
 4. Track the new key order
 
 ```typescript
 for (const item of items) {
   if (item instanceof DynamicBinding && item.key !== undefined) {
-    const { instance, reused } = parent.getOrCreateChild(item.key, () => 
-      TemplateInstance.create(runtime, item.getTemplate(), item.values, true)
-    );
-    entries.push({ instance, reused, key: item.key });
+    let instance = state.cache.get(item.key);
+    // Reuse or create...
+    if (!instance) {
+       instance = TemplateInstance.create(runtime, item.getTemplate(), item.values, true);
+       state.cache.set(item.key, instance);
+    }
+    entries.push({ instance, reused: !!instance, key: item.key });
     newKeyOrder.push(item.key);
   }
 }
@@ -77,26 +80,43 @@ Only C needs to move
 
 This is optimal - we move the minimum number of items needed.
 
-### Phase 3: Reconcile DOM
+### Phase 3: Extract Movers
 
-Walk through the new order, maintaining an `insertionPoint` that tracks where to insert next:
+Before modifying the DOM structure, we perform an extraction pass. Any item identified as "needs move" is extracted into a DocumentFragment. This simplifies the insertion phase by treating moves and new insertions identically.
+
+```typescript
+const movedFragments = new Map<unknown, DocumentFragment>();
+for (const { instance, reused, key } of entries) {
+  if (reused && needsMove.has(key)) {
+    movedFragments.set(key, instance.extractContent());
+  }
+}
+```
+
+### Phase 4: Reconcile DOM
+
+Walk through the new order, maintaining an `insertionPoint` that tracks where to insert next. We handle "garbage" (nodes that shouldn't be there) inline during this pass.
 
 ```typescript
 for (const { instance, reused, key } of entries) {
+  // 1. Clean up garbage: remove nodes between insertionPoint and current item start
+  //    (Only if item is reused and didn't move - moving items are already out)
+  if (reused && !needsMove.has(key)) {
+     removeNodesBetween(insertionPoint, instance.range.start);
+  }
+
+  // 2. Insert if needed
   if (!reused) {
-    // New item - insert fragment after insertionPoint
+    // New item - insert fragment
     parentNode.insertBefore(instance.fragment, insertionPoint.nextSibling);
   } else if (needsMove.has(key)) {
-    // Reused but needs to move - extract and reinsert
-    const fragment = instance.extractContent();
+    // Moved item - insert pre-extracted fragment
+    const fragment = movedFragments.get(key)!;
     parentNode.insertBefore(fragment, insertionPoint.nextSibling);
-  } else {
-    // Reused and in correct position
-    // Remove orphaned nodes between insertionPoint and this item
-    removeNodesBetween(insertionPoint, instanceStart);
   }
-  // Always advance insertionPoint past this item
-  insertionPoint = instanceEnd;
+  
+  // 3. Advance insertionPoint to end of current item
+  insertionPoint = instance.range.end;
 }
 ```
 
@@ -145,9 +165,26 @@ This saves one Comment node per list item, reducing DOM overhead.
 
 ## Performance Characteristics
 
-- **Time Complexity**: O(n²) for LIS computation, O(n) for reconciliation
-- **Space Complexity**: O(n) for tracking instances and indices
-- **DOM Mutations**: Minimal - only moves items that actually changed position
+### Memory Optimization
+- **Localized State**: Key tracking happens in `reconcileKeyedList` loop state, not on the parent `TemplateInstance` object.
+- **Reference Cleanup**: When a list is removed or replaced, the local `Map` is garbage collected immediately.
+- **No array allocations per instance**: Previous versions allocated `children` arrays for every template instance (even non-lists). This is now 0 bytes for non-list instances.
+
+### Time Complexity
+- **LIS Calculation**: O(n log n) in typical implementations, or O(n²) in simple ones (currently simple).
+- **DOM Access**: O(n) - Single pass over the new list.
+- **Reconciliation**: O(n) - We touch each item exactly once in the main loop.
+
+### Space Complexity
+- O(n) for the `cache` Map (stores active instances).
+- O(n) for `newKeyOrder` array.
+- 0 additional overhead for non-keyed items.
+
+### DOM Mutations
+- **Moves**: Only items not in the Longest Increasing Subsequence are moved.
+- **Insertions**: New items are inserted directly.
+- **Deletions**: Handled inline during the walk (removes gaps) or at the end (removes trailing nodes).
+- **Fragmentation**: Reduced by extracting movers into Fragments before re-insertion.
 
 ### What Gets Moved
 
