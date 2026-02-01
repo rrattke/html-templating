@@ -498,7 +498,7 @@ function commitReconciliation(
   newOrder: unknown[]
 ): void {
   const needsMove = computeItemsToMove(state.order, newOrder);
-  const movedFragments = extractMovedFragments(entries, needsMove);
+  const movingFragments = extractMovingFragments(entries, needsMove);
   
   let insertionPoint = range.start;
   const parentNode = range.start.parentNode!;
@@ -518,7 +518,7 @@ function commitReconciliation(
       parentNode.insertBefore(instance.fragment, insertionPoint.nextSibling);
     } else if (needsMove.has(id)) {
       // Moved item
-      const fragment = movedFragments.get(id)!;
+      const fragment = movingFragments.get(id)!;
       parentNode.insertBefore(fragment, insertionPoint.nextSibling);
     }
     // Else: reused and not moved, already in place
@@ -540,17 +540,17 @@ function commitReconciliation(
 /**
  * Extracts content for items that need to be moved to preserve state.
  */
-function extractMovedFragments(
+function extractMovingFragments(
   entries: ListEntry[], 
   needsMove: Set<unknown>
 ): Map<unknown, DocumentFragment> {
-  const movedFragments = new Map<unknown, DocumentFragment>();
+  const movingFragments = new Map<unknown, DocumentFragment>();
   for (const { instance, reused, id } of entries) {
     if (reused && needsMove.has(id)) {
-      movedFragments.set(id, instance.extractContent());
+      movingFragments.set(id, instance.extractContent());
     }
   }
-  return movedFragments;
+  return movingFragments;
 }
 
 /**
