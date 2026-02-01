@@ -1,6 +1,6 @@
 # Declarative List Rendering
 
-This document expands Scenario A from [declarative-data-sources-and-templated-lists.md](declarative-data-sources-and-templated-lists.md): how to render lists from arrays *without* introducing a dedicated Web Component.
+This document expands Scenario A from [../templates-vs-documents.md](../templates-vs-documents.md): how to render lists from arrays *without* introducing a dedicated Web Component.
 
 The goal is to keep templates "HTML-shaped" while still supporting:
 
@@ -107,4 +107,4 @@ root.appendChild(instance.fragment);
 
 If you want templates that look like documents/fragments (Aurelia-style), see:
 
-- [html-authored-templates.md](html-authored-templates.md)
+- [../html-authored-templates.md](../html-authored-templates.md)

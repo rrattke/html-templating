@@ -1,6 +1,6 @@
 # Visual HTML Editor Roundtrip (DOM ↔ Model)
 
-This document expands Scenario B from [declarative-data-sources-and-templated-lists.md](declarative-data-sources-and-templated-lists.md): a workflow where users *author* a plot/chart visually and the persisted output is **HTML**.
+This document expands Scenario B from [../templates-vs-documents.md](../templates-vs-documents.md): a workflow where users *author* a plot/chart visually and the persisted output is **HTML**.
 
 The core challenge is the **roundtrip**:
 
