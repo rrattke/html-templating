@@ -6,6 +6,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { DynamicBinding, TemplateInstance } from './render.js';
 import { StandardAttributePart, PropertyAttributePart, BooleanAttributePart, EventAttributePart } from './parts.js';
+import { repeat } from './directives.js';
 
 describe('Template to Part Translation', () => {
   // Create a mock runtime for testing
@@ -977,6 +978,69 @@ describe('Boolean Attribute Binding', () => {
     const button = container.querySelector('button');
     expect(button?.hasAttribute('disabled')).toBe(true);
     expect(button?.hasAttribute('hidden')).toBe(false);
+  });
+});
+
+describe('Template Directives', () => {
+  let container: HTMLElement;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+  });
+
+  afterEach(() => {
+    container.remove();
+  });
+
+  it('repeat() should reconcile keyed lists and preserve DOM identity on reorder', () => {
+    type Item = { id: string; label: string };
+
+    let items: Item[] = [
+      { id: 'a', label: 'A' },
+      { id: 'b', label: 'B' },
+      { id: 'c', label: 'C' },
+    ];
+
+    const effects: Array<() => void> = [];
+    const runtime = {
+      effect: (fn: () => void) => {
+        effects.push(fn);
+        fn();
+        return () => {};
+      }
+    } as any;
+
+    const html = DynamicBinding.with(runtime);
+
+    const template = html`<ul>
+      ${repeat(
+        () => items,
+        item => item.id,
+        item => html`<li data-id=${item.id}>${item.label}</li>`,
+      )}
+    </ul>`;
+
+    const instance = template.instance();
+    container.appendChild(instance.fragment);
+
+    const firstRender = Array.from(container.querySelectorAll('li'));
+    expect(firstRender.map(li => li.getAttribute('data-id'))).toEqual(['a', 'b', 'c']);
+    const nodeA = firstRender[0];
+    const nodeB = firstRender[1];
+    const nodeC = firstRender[2];
+
+    // Reorder: [a,b,c] -> [c,a,b]
+    items = [{ id: 'c', label: 'C' }, { id: 'a', label: 'A' }, { id: 'b', label: 'B' }];
+    effects.forEach(fn => fn());
+
+    const secondRender = Array.from(container.querySelectorAll('li'));
+    expect(secondRender.map(li => li.getAttribute('data-id'))).toEqual(['c', 'a', 'b']);
+
+    // Identity preserved (same nodes, moved)
+    expect(secondRender[0]).toBe(nodeC);
+    expect(secondRender[1]).toBe(nodeA);
+    expect(secondRender[2]).toBe(nodeB);
   });
 });
 
