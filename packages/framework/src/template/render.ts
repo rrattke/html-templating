@@ -95,22 +95,22 @@ export class DynamicBinding extends StaticBinding {
    * Creates an html`` tag function bound to a specific runtime.
    * Supports both direct use (html`...`) and identified use (html(id)`...`).
    */
-  static with(runtime: SignalsRuntime): ((strings: TemplateStringsArray, ...values: unknown[]) => DynamicBinding) & ((id?: unknown) => (strings: TemplateStringsArray, ...values: unknown[]) => DynamicBinding) {
-    const htmlFunction = ((stringsOrId?: TemplateStringsArray | unknown, ...values: unknown[]) => {
+  static with(runtime: SignalsRuntime): ((strings: readonly string[], ...values: unknown[]) => DynamicBinding) & ((id?: unknown) => (strings: readonly string[], ...values: unknown[]) => DynamicBinding) {
+    const htmlFunction = ((stringsOrId?: readonly string[] | unknown, ...values: unknown[]) => {
       // If called as a template tag: html``
-      if (stringsOrId && typeof stringsOrId === 'object' && 'raw' in stringsOrId) {
-        return new DynamicBinding(stringsOrId as TemplateStringsArray, values, runtime);
+      if (Array.isArray(stringsOrId) && 'raw' in stringsOrId) {
+        return new DynamicBinding(stringsOrId as readonly string[], values, runtime);
       }
       // If called as a function: html(id)
       const id = stringsOrId;
-      return (strings: TemplateStringsArray, ...values: unknown[]) => {
+      return (strings: readonly string[], ...values: unknown[]) => {
         const binding = new DynamicBinding(strings, values, runtime);
         if (id !== undefined) {
           binding.id = id;
         }
         return binding;
       };
-    }) as ((strings: TemplateStringsArray, ...values: unknown[]) => DynamicBinding) & ((id?: unknown) => (strings: TemplateStringsArray, ...values: unknown[]) => DynamicBinding);
+    }) as ((strings: readonly string[], ...values: unknown[]) => DynamicBinding) & ((id?: unknown) => (strings: readonly string[], ...values: unknown[]) => DynamicBinding);
 
     return htmlFunction;
   }
