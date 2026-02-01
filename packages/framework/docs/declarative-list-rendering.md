@@ -43,9 +43,10 @@ Cons: templates contain JS control-flow.
 
 Use a small helper so the template reads more like HTML.
 
-Note: the `repeat()` directive is currently part of the project vision and may live on an experimental branch rather than `main`.
+Note: `repeat()` is an optional convenience API. It is part of the project vision and the current prototype lives on the `repeat-directive` branch (not on `main`).
 
 ```ts
+// Pseudocode (see branch: repeat-directive)
 import { html, repeat } from '@vanishing/framework/template';
 
 export const view = (items: readonly { id: string; label: string }[]) => html`

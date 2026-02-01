@@ -64,10 +64,11 @@ export const view = (items: readonly Todo[]) => html`
 
 If you prefer keeping control-flow out of the template body, use a list directive.
 
-Note: this `repeat()` helper is an optional convenience API. If it is not available in your build, the inline mapping example above is the baseline that works everywhere.
+Note: this `repeat()` helper is an optional convenience API. The current prototype lives on the `repeat-directive` branch (not on `main`). If it is not available in your build, the inline mapping example above is the baseline that works everywhere.
 
 ```ts
-import { html, repeat } from '../src/template.js';
+// Pseudocode (see branch: repeat-directive)
+import { html, repeat } from '@vanishing/framework/template';
 
 export const view = (items: readonly Todo[]) => html`
   <ul>

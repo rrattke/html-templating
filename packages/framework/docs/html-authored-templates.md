@@ -113,6 +113,8 @@ This is less expressive but much easier to implement without a full expression l
 
 Conceptually, it compiles that template into something equivalent to:
 
+Note: `repeat()` here refers to a keyed-list primitive. A prototype exists on the `repeat-directive` branch, but the HTML-authored direction does not depend on that exact API.
+
 ```ts
 html`<x-plot>
   ${repeat(
