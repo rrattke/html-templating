@@ -203,65 +203,135 @@ export class TemplateInstance {
       }
     }, range);
 
+    // Initialize all parts
     parts.forEach((part, index) => {
-      const value = values[index];
-      if (typeof value === 'function') {
-        if (part instanceof EventAttributePart) {
-          part.setValue(value);
-          disposers.push(() => part.dispose());
-        }
-        else {
-          // Keyed list cache for this part
-          const keyedState = {
-            cache: new Map<unknown, TemplateInstance>(),
-            order: [] as unknown[]
-          };
-          
-          // Dispose cache when this part (and instance) is disposed
-          disposers.push(() => {
-            keyedState.cache.forEach(i => i.dispose());
-            keyedState.cache.clear();
-          });
-
-          const dispose = runtime.effect(() => {
-            const result = value();
-            
-            // For NodeParts with keyed lists, use optimized reconciliation
-            if (part instanceof NodePart && isIterable(result)) {
-              const items = Array.from(result);
-              if (hasKeyedItems(items)) {
-                reconcileKeyedList(items, runtime, part, keyedState);
-                return;
-              }
-            }
-            
-            // If switching away from keyed list, clear cache
-            if (keyedState.cache.size > 0) {
-              keyedState.cache.forEach(i => i.dispose());
-              keyedState.cache.clear();
-              keyedState.order = [];
-            }
-            
-            // Standard processing for non-keyed values
-            const processed = processValue(result, runtime, (cleanup) => {
-                // Register cleanup for created instances
-                // We use runtime.onCleanup so it runs when this effect re-runs
-                runtime.onCleanup(cleanup);
-            });
-            part.setValue(processed);
-          });
-          disposers.push(dispose);
-        }
-      } else {
-        // Static initial value
-        // We register cleanup to the instance's disposers list because there is no effect re-run
-        const processed = processValue(value, runtime, (cleanup) => disposers.push(cleanup));
-        part.setValue(processed);
-      }
+      processPart(part, values[index], runtime, disposers);
     });
 
     return instance;
   }
+}
+
+/**
+ * Configures a part with its value, handling both static and reactive bindings.
+ * @param part The template part to configure
+ * @param value The value to bind
+ * @param runtime SignalsRuntime for effect creation
+ * @param disposers Array to collect cleanup functions
+ */
+function processPart(
+  part: Part,
+  value: unknown,
+  runtime: SignalsRuntime,
+  disposers: Array<() => void>
+): void {
+  if (typeof value === 'function') {
+    if (part instanceof EventAttributePart) {
+      setupEventBinding(part, value as EventListener, disposers);
+    } else {
+      setupReactiveBinding(part, value as () => unknown, runtime, disposers);
+    }
+  } else {
+    setupStaticPartBinding(part, value, runtime, disposers);
+  }
+}
+
+/**
+ * Sets up an event listener binding.
+ * @param part Event attribute part
+ * @param handler Event listener function
+ * @param disposers Collection of cleanup functions
+ */
+function setupEventBinding(
+  part: EventAttributePart,
+  handler: EventListener,
+  disposers: Array<() => void>
+): void {
+  part.setValue(handler);
+  disposers.push(() => part.dispose());
+}
+
+/**
+ * Sets up a reactive binding that updates when signals change.
+ * Handles both standard values and keyed lists.
+ * @param part Check if this needs list reconciliation
+ * @param valueFn Signal getter or computed function
+ * @param runtime SignalsRuntime
+ * @param disposers Collection of cleanup functions
+ */
+function setupReactiveBinding(
+  part: Part,
+  valueFn: () => unknown,
+  runtime: SignalsRuntime,
+  disposers: Array<() => void>
+): void {
+  // Keyed list cache for this part
+  const keyedState = {
+    cache: new Map<unknown, TemplateInstance>(),
+    order: [] as unknown[]
+  };
+
+  // Ensure cache is cleaned up when part is disposed
+  disposers.push(() => {
+    keyedState.cache.forEach(i => i.dispose());
+    keyedState.cache.clear();
+  });
+
+  const dispose = runtime.effect(() => {
+    const result = valueFn();
+    
+    // Optimized path for keyed lists
+    if (part instanceof NodePart && isKeyedListCandidate(result)) {
+      const items = Array.from(result);
+      if (hasKeyedItems(items)) {
+        reconcileKeyedList(items, runtime, part, keyedState);
+        return;
+      }
+    }
+    
+    // Cleanup keyed state if we transitioned out of a keyed list
+    if (keyedState.cache.size > 0) {
+      keyedState.cache.forEach(i => i.dispose());
+      keyedState.cache.clear();
+      keyedState.order = [];
+    }
+    
+    // Standard processing
+    const processed = processValue(result, runtime, (cleanup) => {
+        // Register cleanup for created instances
+        // We use runtime.onCleanup so it runs when this effect re-runs
+        runtime.onCleanup(cleanup);
+    });
+    part.setValue(processed);
+  });
+  
+  disposers.push(dispose);
+}
+
+/**
+ * Sets up a one-time static binding.
+ * @param part Target part
+ * @param value Static value
+ * @param runtime Runtime (needed for nested dynamic content)
+ * @param disposers Collection of cleanup functions
+ */
+function setupStaticPartBinding(
+  part: Part,
+  value: unknown,
+  runtime: SignalsRuntime,
+  disposers: Array<() => void>
+): void {
+  // Static initial value
+  // We register cleanup to the instance's disposers list because there is no effect re-run
+  const processed = processValue(value, runtime, (cleanup) => disposers.push(cleanup));
+  part.setValue(processed);
+}
+
+/**
+ * Helper to determine if a value might be a keyed list.
+ */
+function isKeyedListCandidate(value: unknown): value is Iterable<unknown> {
+  return isIterable(value);
 }
 
 /**
@@ -317,32 +387,78 @@ function processValue(
  * Reconciles a keyed list directly into a NodePart's range.
  * Minimizes DOM mutations by only moving items that changed position.
  */
+/**
+ * State for keyed list reconciliation.
+ */
+interface KeyedListState {
+  cache: Map<unknown, TemplateInstance>;
+  order: unknown[];
+}
+
+/**
+ * Intermediate entry for keyed list reconciliation.
+ */
+interface KeyedEntry {
+  instance: TemplateInstance;
+  reused: boolean;
+  key: unknown;
+}
+
+/**
+ * Reconciles a keyed list of items in the DOM.
+ * Optimized to minimize DOM moves using the LIS algorithm.
+ */
 function reconcileKeyedList(
   items: unknown[], 
   runtime: SignalsRuntime, 
   part: NodePart,
-  state: { cache: Map<unknown, TemplateInstance>, order: unknown[] }
+  state: KeyedListState
 ): void {
   const range = part.range;
   const newKeyOrder: unknown[] = [];
   
-  // Reference node to know where the list ends in the DOM
-  const endAnchor = range.end.nextSibling;
+  // 1. Collect instances and determine reuse
+  const { entries, currentKeys } = collectKeyedInstances(
+    runtime, 
+    items, 
+    state.cache, 
+    newKeyOrder
+  );
+
+  // 2. Remove unused instances
+  cleanupRemovedInstances(state.cache, currentKeys);
+
+  // 3. Commit changes to the DOM
+  commitKeyedReconciliation(
+    range,
+    entries,
+    state,
+    newKeyOrder
+  );
   
-  // First pass: collect keys and get/create instances
-  const entries: Array<{ 
-    instance: TemplateInstance; 
-    reused: boolean; 
-    key: unknown;
-  }> = [];
-  
+  // Update state for next render
+  state.order = newKeyOrder;
+}
+
+/**
+ * Collects template instances for the current list items.
+ * Creates new instances or reuses existing ones from the cache.
+ */
+function collectKeyedInstances(
+  runtime: SignalsRuntime,
+  items: unknown[],
+  cache: Map<unknown, TemplateInstance>,
+  newKeyOrder: unknown[]
+): { entries: KeyedEntry[], currentKeys: Set<unknown> } {
+  const entries: KeyedEntry[] = [];
   const currentKeys = new Set<unknown>();
 
   for (const item of items) {
     if (item instanceof DynamicBinding && item.key !== undefined) {
       currentKeys.add(item.key);
+      newKeyOrder.push(item.key);
       
-      let instance = state.cache.get(item.key);
+      let instance = cache.get(item.key);
       let reused = false;
       
       if (instance) {
@@ -351,83 +467,112 @@ function reconcileKeyedList(
         // Create new instance without registering a disposer to the parent list
         // Disposal is handled by the cache cleanup or item removal logic
         instance = TemplateInstance.create(runtime, item.getTemplate(), item.values, true);
-        state.cache.set(item.key, instance);
+        cache.set(item.key, instance);
       }
 
       entries.push({ instance, reused, key: item.key });
-      newKeyOrder.push(item.key);
     }
   }
+  
+  return { entries, currentKeys };
+}
 
-  // Detect and dispose removed items
-  for (const [key, instance] of state.cache) {
+/**
+ * Disposes template instances that are no longer present in the list.
+ */
+function cleanupRemovedInstances(
+  cache: Map<unknown, TemplateInstance>,
+  currentKeys: Set<unknown>
+): void {
+  for (const [key, instance] of cache) {
     if (!currentKeys.has(key)) {
       instance.dispose();
-      state.cache.delete(key);
+      cache.delete(key);
     }
   }
+}
+
+/**
+ * Applies the reconciliation changes to the DOM.
+ * Moves reused items and inserts new ones.
+ */
+function commitKeyedReconciliation(
+  range: NodeRange,
+  entries: KeyedEntry[],
+  state: KeyedListState,
+  newKeyOrder: unknown[]
+): void {
+  const needsMove = computeItemsToMove(state.order, newKeyOrder);
+  const movedFragments = extractMovedFragments(entries, needsMove);
   
-  // Get the previous order of keys
-  const oldKeyOrder = state.order;
-  
-  // Compute which items need to move
-  const needsMove = computeItemsToMove(oldKeyOrder, newKeyOrder);
-  
-  // Extract reused items that need to move
-  const movedFragments = new Map<unknown, DocumentFragment>();
-  for (const { instance, reused, key } of entries) {
-    if (reused && needsMove.has(key)) {
-      movedFragments.set(key, instance.extractContent());
-    }
-  }
-  
-  // Track our insertion point as we reconcile
-  let insertionPoint: Node = range.start;
+  let insertionPoint = range.start;
   const parentNode = range.start.parentNode!;
-  
+  const endAnchor = range.end.nextSibling;
+
   for (const { instance, reused, key } of entries) {
     const instanceStart = instance.range.start;
     const instanceEnd = instance.range.end;
     
     // Clean up garbage nodes before the next item
     if (reused && !needsMove.has(key)) {
-      let node = insertionPoint.nextSibling;
-      while (node && node !== instanceStart && node !== endAnchor) {
-        const next = node.nextSibling;
-        node.remove();
-        node = next;
-      }
+      processGarbageNodes(insertionPoint, instanceStart, endAnchor);
     }
 
     if (!reused) {
+      // New item
       parentNode.insertBefore(instance.fragment, insertionPoint.nextSibling);
-      insertionPoint = instanceEnd;
     } else if (needsMove.has(key)) {
+      // Moved item
       const fragment = movedFragments.get(key)!;
       parentNode.insertBefore(fragment, insertionPoint.nextSibling);
-      insertionPoint = instanceEnd;
-    } else {
-      insertionPoint = instanceEnd;
     }
+    // Else: reused and not moved, already in place
+    
+    insertionPoint = instanceEnd;
   }
   
-  // Remove any remaining nodes after the last item up to the boundary
-  let node = insertionPoint.nextSibling;
-  while (node && node !== endAnchor) {
-    const next = node.nextSibling;
-    node.remove();
-    node = next;
-  }
-  
+  // Remove trailing garbage
+  processGarbageNodes(insertionPoint, endAnchor, null);
+
   // Update range end
   if (entries.length > 0) {
     range.setEnd(entries[entries.length - 1].instance.range.end);
   } else {
     range.setEnd(range.start);
   }
-  
-  // Update state order for next run
-  state.order = newKeyOrder;
+}
+
+/**
+ * Extracts content for items that need to be moved to preserve state.
+ */
+function extractMovedFragments(
+  entries: KeyedEntry[], 
+  needsMove: Set<unknown>
+): Map<unknown, DocumentFragment> {
+  const movedFragments = new Map<unknown, DocumentFragment>();
+  for (const { instance, reused, key } of entries) {
+    if (reused && needsMove.has(key)) {
+      movedFragments.set(key, instance.extractContent());
+    }
+  }
+  return movedFragments;
+}
+
+/**
+ * Removes nodes between current position and target node.
+ */
+function processGarbageNodes(
+  fromNode: Node, 
+  targetNode: Node | null, 
+  stopNode: Node | null
+): void {
+  let node = fromNode.nextSibling;
+  // Safety check to avoid infinite loops or removing stopNode
+  while (node && node !== targetNode && node !== stopNode) {
+    const next = node.nextSibling;
+    node.remove();
+    node = next;
+  }
 }
 
 /**
