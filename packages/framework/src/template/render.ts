@@ -595,10 +595,24 @@ function computeItemsToMove(oldOrder: unknown[], newOrder: unknown[]): Set<unkno
 }
 
 /**
- * Returns the indices of the longest increasing subsequence.
- * O(n log n) complexity.
+ * Computes the Longest Increasing Subsequence (LIS) of an array of numbers.
+ * The function returns the *indices* of the items that make up the subsequence.
+ * This is used for list reconciliation to find the largest set of items that stay 
+ * in relative order, allowing us to move only the remaining items.
+ * 
+ * Algorithm: O(n log n) using binary search (patience sorting variant).
+ * 
+ * @param arr The input array of numbers (e.g., indices from the old list).
+ * @return An array of *indices from the input array* that form the LIS.
+ * 
+ * @example
+ * // Input values: [10, 20, 5, 30]
+ * // Indices:      [0,  1,  2, 3]
+ * // LIS values:   [10, 20, 30]
+ * // LIS indices:  [0, 1, 3]
+ * longestIncreasingSubsequence([10, 20, 5, 30]) // -> [0, 1, 3]
  */
-function longestIncreasingSubsequence(arr: number[]): number[] {
+export function longestIncreasingSubsequence(arr: number[]): number[] {
   const n = arr.length;
   if (n === 0) return [];
   
