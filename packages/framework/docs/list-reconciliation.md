@@ -171,7 +171,7 @@ This saves one Comment node per list item, reducing DOM overhead.
 - **No array allocations per instance**: Previous versions allocated `children` arrays for every template instance (even non-lists). This is now 0 bytes for non-list instances.
 
 ### Time Complexity
-- **LIS Calculation**: O(n log n) in typical implementations, or O(n²) in simple ones (currently simple).
+- **LIS Calculation**: O(n log n) - Uses binary search on result tails.
 - **DOM Access**: O(n) - Single pass over the new list.
 - **Reconciliation**: O(n) - We touch each item exactly once in the main loop.
 

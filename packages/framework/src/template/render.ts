@@ -468,39 +468,53 @@ function computeItemsToMove(oldOrder: unknown[], newOrder: unknown[]): Set<unkno
 
 /**
  * Returns the indices of the longest increasing subsequence.
+ * O(n log n) complexity.
  */
 function longestIncreasingSubsequence(arr: number[]): number[] {
-  if (arr.length === 0) return [];
-  
   const n = arr.length;
-  const dp: number[] = new Array(n).fill(1);
-  const parent: number[] = new Array(n).fill(-1);
+  if (n === 0) return [];
   
-  let maxLen = 1;
-  let maxIdx = 0;
+  const result: number[] = [];
+  const p = new Int32Array(n);
   
-  for (let i = 1; i < n; i++) {
-    for (let j = 0; j < i; j++) {
-      if (arr[j] < arr[i] && dp[j] + 1 > dp[i]) {
-        dp[i] = dp[j] + 1;
-        parent[i] = j;
+  for (let i = 0; i < n; i++) {
+    const val = arr[i];
+    
+    if (result.length === 0 || val > arr[result[result.length - 1]]) {
+      if (result.length > 0) {
+        p[i] = result[result.length - 1];
+      }
+      result.push(i);
+      continue;
+    }
+    
+    let u = 0;
+    let v = result.length - 1;
+    while (u < v) {
+      const c = (u + v) >>> 1;
+      if (arr[result[c]] < val) {
+        u = c + 1;
+      } else {
+        v = c;
       }
     }
-    if (dp[i] > maxLen) {
-      maxLen = dp[i];
-      maxIdx = i;
+    
+    if (val < arr[result[u]]) {
+      if (u > 0) {
+        p[i] = result[u - 1];
+      }
+      result[u] = i;
     }
   }
   
-  // Reconstruct the indices
-  const result: number[] = [];
-  let idx = maxIdx;
-  while (idx !== -1) {
-    result.push(idx);
-    idx = parent[idx];
+  let u = result.length;
+  let v = result[u - 1];
+  while (u-- > 0) {
+    result[u] = v;
+    v = p[v];
   }
   
-  return result.reverse();
+  return result;
 }
 
 /**
