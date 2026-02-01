@@ -365,4 +365,44 @@ describe('html template function', () => {
       }
     });
   });
+
+  describe('unquoted attribute followed by interpolated attribute', () => {
+    it('should correctly parse unquoted attr followed by quoted attr with interpolation', () => {
+      // This is the pattern: <li data-id=${id} style="view-transition-name: item-${id}">
+      const strings = ['<li data-id=', ' style="view-transition-name: item-', '">', '</li>'] as unknown as TemplateStringsArray;
+      const template = getTemplate(strings);
+      
+      expect(template.descriptors).toHaveLength(3);
+      // First is simple attribute
+      expect(template.descriptors[0].type).toBe('attribute');
+      if (template.descriptors[0].type === 'attribute') {
+        expect(template.descriptors[0].name).toBe('data-id');
+      }
+      // Second is textTemplate for interpolated style
+      expect(template.descriptors[1].type).toBe('textTemplate');
+      if (template.descriptors[1].type === 'textTemplate') {
+        expect(template.descriptors[1].target).toBe('attribute');
+        expect(template.descriptors[1].name).toBe('style');
+        expect(template.descriptors[1].strings).toEqual(['view-transition-name: item-', '']);
+      }
+      // Third is node part for content
+      expect(template.descriptors[2].type).toBe('node');
+    });
+
+    it('should correctly parse unquoted attr, quoted interpolated attr, and text content', () => {
+      // Full pattern: <li data-id=${id} style="name: item-${id}"><span>${label}</span></li>
+      const strings = [
+        '<li data-id=',                    // ends after unquoted attr name=
+        ' style="name: item-',             // space, then quoted attr with prefix
+        '"><span>',                        // end quote, tag close, nested element
+        '</span></li>'                     // close elements
+      ] as unknown as TemplateStringsArray;
+      const template = getTemplate(strings);
+      
+      expect(template.descriptors).toHaveLength(3);
+      expect(template.descriptors[0].type).toBe('attribute');
+      expect(template.descriptors[1].type).toBe('textTemplate');
+      expect(template.descriptors[2].type).toBe('node');
+    });
+  });
 });

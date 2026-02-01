@@ -119,7 +119,10 @@ function createHtmlTemplate(strings: readonly string[]): HTMLTemplateElement {
     if (context.inAttributeValue()) {
       const mode = context.getMode();
       const marker = createAttributeMarker(i);
-      html += needsQuotes(mode) ? `"${marker}"` : marker;
+      const markerWithQuotes = needsQuotes(mode) ? `"${marker}"` : marker;
+      html += markerWithQuotes;
+      // Advance tracker through the marker we just inserted so it knows about any quotes we added
+      context.advance(markerWithQuotes);
     } else {
       html += createNodeMarker(i);
     }
