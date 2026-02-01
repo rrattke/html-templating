@@ -72,7 +72,7 @@ export class StaticBinding {
 }
 
 /**
- * Dynamic template binding - extends StaticBinding with runtime and key.
+ * Dynamic template binding - extends StaticBinding with runtime and unique id.
  * Used for reactive templates that update when signals change.
  * 
  * @example
@@ -84,7 +84,7 @@ export class StaticBinding {
  */
 export class DynamicBinding extends StaticBinding {
   #runtime: SignalsRuntime;
-  key?: unknown;
+  id?: unknown;
 
   constructor(strings: readonly string[], values: unknown[], runtime: SignalsRuntime) {
     super(strings, values);
@@ -93,35 +93,30 @@ export class DynamicBinding extends StaticBinding {
 
   /**
    * Creates an html`` tag function bound to a specific runtime.
-   * Supports both direct use (html`...`) and keyed use (html(key)`...`).
+   * Supports both direct use (html`...`) and identified use (html(id)`...`).
    */
-  static with(runtime: SignalsRuntime): ((strings: TemplateStringsArray, ...values: unknown[]) => DynamicBinding) & ((key?: unknown) => (strings: TemplateStringsArray, ...values: unknown[]) => DynamicBinding) {
-    const htmlFunction = ((stringsOrKey?: TemplateStringsArray | unknown, ...values: unknown[]) => {
+  static with(runtime: SignalsRuntime): ((strings: TemplateStringsArray, ...values: unknown[]) => DynamicBinding) & ((id?: unknown) => (strings: TemplateStringsArray, ...values: unknown[]) => DynamicBinding) {
+    const htmlFunction = ((stringsOrId?: TemplateStringsArray | unknown, ...values: unknown[]) => {
       // If called as a template tag: html``
-      if (stringsOrKey && typeof stringsOrKey === 'object' && 'raw' in stringsOrKey) {
-        return new DynamicBinding(stringsOrKey as TemplateStringsArray, values, runtime);
+      if (stringsOrId && typeof stringsOrId === 'object' && 'raw' in stringsOrId) {
+        return new DynamicBinding(stringsOrId as TemplateStringsArray, values, runtime);
       }
-      // If called as a function: html(key)
-      const key = stringsOrKey;
+      // If called as a function: html(id)
+      const id = stringsOrId;
       return (strings: TemplateStringsArray, ...values: unknown[]) => {
         const binding = new DynamicBinding(strings, values, runtime);
-        if (key !== undefined) {
-          binding.key = key;
+        if (id !== undefined) {
+          binding.id = id;
         }
         return binding;
       };
-    }) as ((strings: TemplateStringsArray, ...values: unknown[]) => DynamicBinding) & ((key?: unknown) => (strings: TemplateStringsArray, ...values: unknown[]) => DynamicBinding);
+    }) as ((strings: TemplateStringsArray, ...values: unknown[]) => DynamicBinding) & ((id?: unknown) => (strings: TemplateStringsArray, ...values: unknown[]) => DynamicBinding);
 
     return htmlFunction;
   }
 
   get runtime(): SignalsRuntime {
     return this.#runtime;
-  }
-
-  setKey(keyValue: unknown): this {
-    this.key = keyValue;
-    return this;
   }
 
   instance() {
@@ -266,34 +261,34 @@ function setupReactiveBinding(
   disposers: Array<() => void>
 ): void {
   // Keyed list cache for this part
-  const keyedState = {
+  const listState = {
     cache: new Map<unknown, TemplateInstance>(),
     order: [] as unknown[]
   };
 
   // Ensure cache is cleaned up when part is disposed
   disposers.push(() => {
-    keyedState.cache.forEach(i => i.dispose());
-    keyedState.cache.clear();
+    listState.cache.forEach(i => i.dispose());
+    listState.cache.clear();
   });
 
   const dispose = runtime.effect(() => {
     const result = valueFn();
     
-    // Optimized path for keyed lists
-    if (part instanceof NodePart && isKeyedListCandidate(result)) {
+    // Optimized path for identified lists
+    if (part instanceof NodePart && isListCandidate(result)) {
       const items = Array.from(result);
-      if (hasKeyedItems(items)) {
-        reconcileKeyedList(items, runtime, part, keyedState);
+      if (hasIdentifiableItems(items)) {
+        reconcileList(items, runtime, part, listState);
         return;
       }
     }
     
-    // Cleanup keyed state if we transitioned out of a keyed list
-    if (keyedState.cache.size > 0) {
-      keyedState.cache.forEach(i => i.dispose());
-      keyedState.cache.clear();
-      keyedState.order = [];
+    // Cleanup list state if we transitioned out of a list
+    if (listState.cache.size > 0) {
+      listState.cache.forEach(i => i.dispose());
+      listState.cache.clear();
+      listState.order = [];
     }
     
     // Standard processing
@@ -328,9 +323,9 @@ function setupStaticPartBinding(
 }
 
 /**
- * Helper to determine if a value might be a keyed list.
+ * Helper to determine if a value might be a list.
  */
-function isKeyedListCandidate(value: unknown): value is Iterable<unknown> {
+function isListCandidate(value: unknown): value is Iterable<unknown> {
   return isIterable(value);
 }
 
@@ -384,81 +379,81 @@ function processValue(
 }
 
 /**
- * Reconciles a keyed list directly into a NodePart's range.
+ * Reconciles a list directly into a NodePart's range.
  * Minimizes DOM mutations by only moving items that changed position.
  */
 /**
- * State for keyed list reconciliation.
+ * State for list reconciliation.
  */
-interface KeyedListState {
+interface ListState {
   cache: Map<unknown, TemplateInstance>;
   order: unknown[];
 }
 
 /**
- * Intermediate entry for keyed list reconciliation.
+ * Intermediate entry for list reconciliation.
  */
-interface KeyedEntry {
+interface ListEntry {
   instance: TemplateInstance;
   reused: boolean;
-  key: unknown;
+  id: unknown;
 }
 
 /**
- * Reconciles a keyed list of items in the DOM.
+ * Reconciles a list of items in the DOM.
  * Optimized to minimize DOM moves using the LIS algorithm.
  */
-function reconcileKeyedList(
+function reconcileList(
   items: unknown[], 
   runtime: SignalsRuntime, 
   part: NodePart,
-  state: KeyedListState
+  state: ListState
 ): void {
   const range = part.range;
-  const newKeyOrder: unknown[] = [];
+  const newOrder: unknown[] = [];
   
   // 1. Collect instances and determine reuse
-  const { entries, currentKeys } = collectKeyedInstances(
+  const { entries, currentIds } = collectInstances(
     runtime, 
     items, 
     state.cache, 
-    newKeyOrder
+    newOrder
   );
 
   // 2. Remove unused instances
-  cleanupRemovedInstances(state.cache, currentKeys);
+  cleanupRemovedInstances(state.cache, currentIds);
 
   // 3. Commit changes to the DOM
-  commitKeyedReconciliation(
+  commitReconciliation(
     range,
     entries,
     state,
-    newKeyOrder
+    newOrder
   );
   
   // Update state for next render
-  state.order = newKeyOrder;
+  state.order = newOrder;
 }
 
 /**
  * Collects template instances for the current list items.
  * Creates new instances or reuses existing ones from the cache.
  */
-function collectKeyedInstances(
+function collectInstances(
   runtime: SignalsRuntime,
   items: unknown[],
   cache: Map<unknown, TemplateInstance>,
-  newKeyOrder: unknown[]
-): { entries: KeyedEntry[], currentKeys: Set<unknown> } {
-  const entries: KeyedEntry[] = [];
-  const currentKeys = new Set<unknown>();
+  newOrder: unknown[]
+): { entries: ListEntry[], currentIds: Set<unknown> } {
+  const entries: ListEntry[] = [];
+  const currentIds = new Set<unknown>();
 
   for (const item of items) {
-    if (item instanceof DynamicBinding && item.key !== undefined) {
-      currentKeys.add(item.key);
-      newKeyOrder.push(item.key);
+    if (item instanceof DynamicBinding && item.id !== undefined) {
+      currentIds.add(item.id);
+      newOrder.push(item.id);
       
-      let instance = cache.get(item.key);
+      let instance = cache.get(item.id);
       let reused = false;
       
       if (instance) {
@@ -467,14 +462,14 @@ function collectKeyedInstances(
         // Create new instance without registering a disposer to the parent list
         // Disposal is handled by the cache cleanup or item removal logic
         instance = TemplateInstance.create(runtime, item.getTemplate(), item.values, true);
-        cache.set(item.key, instance);
+        cache.set(item.id, instance);
       }
 
-      entries.push({ instance, reused, key: item.key });
+      entries.push({ instance, reused, id: item.id });
     }
   }
   
-  return { entries, currentKeys };
+  return { entries, currentIds };
 }
 
 /**
@@ -482,12 +477,12 @@ function collectKeyedInstances(
  */
 function cleanupRemovedInstances(
   cache: Map<unknown, TemplateInstance>,
-  currentKeys: Set<unknown>
+  currentIds: Set<unknown>
 ): void {
-  for (const [key, instance] of cache) {
-    if (!currentKeys.has(key)) {
+  for (const [id, instance] of cache) {
+    if (!currentIds.has(id)) {
       instance.dispose();
-      cache.delete(key);
+      cache.delete(id);
     }
   }
 }
@@ -496,34 +491,34 @@ function cleanupRemovedInstances(
  * Applies the reconciliation changes to the DOM.
  * Moves reused items and inserts new ones.
  */
-function commitKeyedReconciliation(
+function commitReconciliation(
   range: NodeRange,
-  entries: KeyedEntry[],
-  state: KeyedListState,
-  newKeyOrder: unknown[]
+  entries: ListEntry[],
+  state: ListState,
+  newOrder: unknown[]
 ): void {
-  const needsMove = computeItemsToMove(state.order, newKeyOrder);
+  const needsMove = computeItemsToMove(state.order, newOrder);
   const movedFragments = extractMovedFragments(entries, needsMove);
   
   let insertionPoint = range.start;
   const parentNode = range.start.parentNode!;
   const endAnchor = range.end.nextSibling;
 
-  for (const { instance, reused, key } of entries) {
+  for (const { instance, reused, id } of entries) {
     const instanceStart = instance.range.start;
     const instanceEnd = instance.range.end;
     
     // Clean up garbage nodes before the next item
-    if (reused && !needsMove.has(key)) {
+    if (reused && !needsMove.has(id)) {
       NodeRange.removeNodes(insertionPoint, instanceStart);
     }
 
     if (!reused) {
       // New item
       parentNode.insertBefore(instance.fragment, insertionPoint.nextSibling);
-    } else if (needsMove.has(key)) {
+    } else if (needsMove.has(id)) {
       // Moved item
-      const fragment = movedFragments.get(key)!;
+      const fragment = movedFragments.get(id)!;
       parentNode.insertBefore(fragment, insertionPoint.nextSibling);
     }
     // Else: reused and not moved, already in place
@@ -546,13 +541,13 @@ function commitKeyedReconciliation(
  * Extracts content for items that need to be moved to preserve state.
  */
 function extractMovedFragments(
-  entries: KeyedEntry[], 
+  entries: ListEntry[], 
   needsMove: Set<unknown>
 ): Map<unknown, DocumentFragment> {
   const movedFragments = new Map<unknown, DocumentFragment>();
-  for (const { instance, reused, key } of entries) {
-    if (reused && needsMove.has(key)) {
-      movedFragments.set(key, instance.extractContent());
+  for (const { instance, reused, id } of entries) {
+    if (reused && needsMove.has(id)) {
+      movedFragments.set(id, instance.extractContent());
     }
   }
   return movedFragments;
@@ -660,10 +655,10 @@ export function longestIncreasingSubsequence(arr: number[]): number[] {
 }
 
 /**
- * Checks if a list contains keyed DynamicBindings.
+ * Checks if a list contains identifiable DynamicBindings.
  */
-function hasKeyedItems(items: unknown[]): boolean {
-  return items.some(item => item instanceof DynamicBinding && item.key !== undefined);
+function hasIdentifiableItems(items: unknown[]): boolean {
+  return items.some(item => item instanceof DynamicBinding && item.id !== undefined);
 }
 
 function isIterable(value: unknown): value is Iterable<unknown> {

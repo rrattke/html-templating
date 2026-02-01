@@ -778,7 +778,7 @@ describe('Keyed Templates', () => {
   it('should create keyed template using html(key) syntax', () => {
     const template = html('my-key')`<div>Content</div>`;
     
-    expect(template.key).toBe('my-key');
+    expect(template.id).toBe('my-key');
     
     const instance = template.instance();
     container.appendChild(instance.fragment);
@@ -791,15 +791,15 @@ describe('Keyed Templates', () => {
     const items = ['a', 'b', 'c'];
     const templates = items.map(item => html(item)`<span>${item}</span>`);
     
-    expect(templates[0].key).toBe('a');
-    expect(templates[1].key).toBe('b');
-    expect(templates[2].key).toBe('c');
+    expect(templates[0].id).toBe('a');
+    expect(templates[1].id).toBe('b');
+    expect(templates[2].id).toBe('c');
   });
 
   it('should work with numeric keys', () => {
     const template = html(123)`<div>Numbered</div>`;
     
-    expect(template.key).toBe(123);
+    expect(template.id).toBe(123);
   });
 });
 
