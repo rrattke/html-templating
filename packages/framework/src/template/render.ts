@@ -515,7 +515,7 @@ function commitKeyedReconciliation(
     
     // Clean up garbage nodes before the next item
     if (reused && !needsMove.has(key)) {
-      processGarbageNodes(insertionPoint, instanceStart, endAnchor);
+      NodeRange.removeNodes(insertionPoint, instanceStart);
     }
 
     if (!reused) {
@@ -532,7 +532,7 @@ function commitKeyedReconciliation(
   }
   
   // Remove trailing garbage
-  processGarbageNodes(insertionPoint, endAnchor, null);
+  NodeRange.removeNodes(insertionPoint, endAnchor);
 
   // Update range end
   if (entries.length > 0) {
@@ -556,23 +556,6 @@ function extractMovedFragments(
     }
   }
   return movedFragments;
-}
-
-/**
- * Removes nodes between current position and target node.
- */
-function processGarbageNodes(
-  fromNode: Node, 
-  targetNode: Node | null, 
-  stopNode: Node | null
-): void {
-  let node = fromNode.nextSibling;
-  // Safety check to avoid infinite loops or removing stopNode
-  while (node && node !== targetNode && node !== stopNode) {
-    const next = node.nextSibling;
-    node.remove();
-    node = next;
-  }
 }
 
 /**

@@ -65,7 +65,7 @@ export class NodeRange {
    * Returns an empty fragment if the range is already empty.
    */
   extractContents(): DocumentFragment {
-    const fragment = NodeRange.extractContents(this.#start, this.#end);
+    const fragment = NodeRange.extractNodes(this.#start, this.#end.nextSibling);
     this.#end = this.#start;
     return fragment;
   }
@@ -76,7 +76,7 @@ export class NodeRange {
    * Returns an empty fragment if the range is empty.
    */
   cloneContents(): DocumentFragment {
-    return NodeRange.cloneContents(this.#start, this.#end);
+    return NodeRange.cloneNodes(this.#start, this.#end.nextSibling);
   }
 
   /**
@@ -84,7 +84,7 @@ export class NodeRange {
    * After deleting contents, the range is empty (end === start).
    */
   deleteContents(): void {
-    NodeRange.deleteContents(this.#start, this.#end);
+    NodeRange.removeNodes(this.#start, this.#end.nextSibling);
     this.#end = this.#start;
   }
 
@@ -134,25 +134,17 @@ export class NodeRange {
   }
 
   /**
-   * Extracts all nodes from start.nextSibling to end (inclusive) into a DocumentFragment.
-   * Exclude start boundary, include end boundary.
-   * Returns empty fragment if start === end (collapsed range).
+   * Extracts all nodes between start and end (exclusive) into a DocumentFragment.
+   * @param start Reference node to start extracting after
+   * @param end Reference node to stop extracting before (can be null)
    */
-  static extractContents(start: Node, end: Node): DocumentFragment {
-    const fragment = NodeRange.ownerDocument(start, end).createDocumentFragment();
+  static extractNodes(start: Node, end: Node | null): DocumentFragment {
+    const fragment = (start.ownerDocument || document).createDocumentFragment();
     
-    if (NodeRange.collapsed(start, end)) {
-      return fragment;
-    }
-
     let node = start.nextSibling;
-    while (node) {
+    while (node && node !== end) {
       const next = node.nextSibling;
-      const isEnd = node === end;
-      fragment.appendChild(node); // Implicitly removes from DOM
-      if (isEnd) {
-        break;
-      }
+      fragment.appendChild(node);
       node = next;
     }
     
@@ -161,8 +153,7 @@ export class NodeRange {
 
   /**
    * Extracts all nodes from start to end (both inclusive) into a DocumentFragment.
-   * Include both start and end boundaries.
-   * Returns empty fragment if start and end are not connected.
+   * Special helper for moving instances (which include their marker).
    */
   static extractInclusive(start: Node, end: Node): DocumentFragment {
     const fragment = NodeRange.ownerDocument(start, end).createDocumentFragment();
@@ -179,23 +170,16 @@ export class NodeRange {
   }
 
   /**
-   * Clones all nodes from start.nextSibling to end (inclusive) into a DocumentFragment.
-   * Exclude start boundary, include end boundary.
-   * Returns empty fragment if start === end (collapsed range).
+   * Clones all nodes between start and end (exclusive) into a DocumentFragment.
+   * @param start Reference node to start cloning after
+   * @param end Reference node to stop cloning before (can be null)
    */
-  static cloneContents(start: Node, end: Node): DocumentFragment {
-    const fragment = NodeRange.ownerDocument(start, end).createDocumentFragment();
+  static cloneNodes(start: Node, end: Node | null): DocumentFragment {
+    const fragment = (start.ownerDocument || document).createDocumentFragment();
     
-    if (NodeRange.collapsed(start, end)) {
-      return fragment;
-    }
-
     let node = start.nextSibling;
-    while (node) {
+    while (node && node !== end) {
       fragment.appendChild(node.cloneNode(true));
-      if (node === end) {
-        break;
-      }
       node = node.nextSibling;
     }
     
@@ -203,19 +187,15 @@ export class NodeRange {
   }
 
   /**
-   * Deletes all nodes from start.nextSibling to end (inclusive).
-   * Exclude start boundary, include end boundary.
-   * No-op if start === end (collapsed range).
+   * Removes all nodes between start and end (exclusive).
+   * @param start Reference node to start deleting after
+   * @param end Reference node to stop deleting before (can be null)
    */
-  static deleteContents(start: Node, end: Node): void {
-    if (NodeRange.collapsed(start, end)) return;
-    
+  static removeNodes(start: Node, end: Node | null): void {
     let node = start.nextSibling;
-    while (node) {
+    while (node && node !== end) {
       const next = node.nextSibling;
-      const isEnd = node === end;
       node.remove();
-      if (isEnd) break;
       node = next;
     }
   }
