@@ -142,6 +142,10 @@ function reconcileKeyedList(
   const range = part.range;
   const newKeyOrder: unknown[] = [];
   
+  // Reference node to know where the list ends in the DOM
+  // We'll remove any trailing garbage up to this node
+  const endAnchor = range.end.nextSibling;
+  
   // First pass: collect keys and get/create instances
   const entries: Array<{ 
     instance: TemplateInstance; 
@@ -165,74 +169,53 @@ function reconcileKeyedList(
   // Compute which items need to move
   const needsMove = computeItemsToMove(oldKeyOrder, newKeyOrder);
   
+  // Extract reused items that need to move
+  const movedFragments = new Map<unknown, DocumentFragment>();
+  for (const { instance, reused, key } of entries) {
+    if (reused && needsMove.has(key)) {
+      movedFragments.set(key, instance.extractContent());
+    }
+  }
+  
   // Track our insertion point as we reconcile
   let insertionPoint: Node = range.start;
   const parentNode = range.start.parentNode!;
-  
-  // Track all nodes that belong to remaining items (for cleanup)
-  const retainedNodes = new Set<Node>();
-  for (const { instance } of entries) {
-    // Collect all nodes in this instance's range
-    let node: Node | null = instance.range.start;
-    while (node) {
-      retainedNodes.add(node);
-      if (node === instance.range.end) break;
-      node = node.nextSibling;
-    }
-  }
   
   for (const { instance, reused, key } of entries) {
     const instanceStart = instance.range.start;
     const instanceEnd = instance.range.end;
     
+    // Clean up garbage nodes before the next item
+    // We only do this if the item is reused and stable (not moved)
+    if (reused && !needsMove.has(key)) {
+      let node = insertionPoint.nextSibling;
+      while (node && node !== instanceStart && node !== endAnchor) {
+        const next = node.nextSibling;
+        node.remove();
+        node = next;
+      }
+    }
+
     if (!reused) {
       // New item - insert its fragment after insertionPoint
-      const fragment = instance.fragment;
-      parentNode.insertBefore(fragment, insertionPoint.nextSibling);
+      parentNode.insertBefore(instance.fragment, insertionPoint.nextSibling);
       insertionPoint = instanceEnd;
     } else if (needsMove.has(key)) {
-      // Reused but needs to move - extract and reinsert at current position
-      const fragment = instance.extractContent();
+      // Reused but moved - insert extracted fragment
+      const fragment = movedFragments.get(key)!;
       parentNode.insertBefore(fragment, insertionPoint.nextSibling);
       insertionPoint = instanceEnd;
     } else {
-      // Reused and in same relative position (LIS says it's stable)
-      // Check if it's actually adjacent to our insertion point
-      if (insertionPoint.nextSibling === instanceStart) {
-        // Already in position - just advance
-        insertionPoint = instanceEnd;
-      } else {
-        // Not adjacent - need to clean up gap and possibly move
-        // First, remove orphaned nodes between insertionPoint and this item
-        let node = insertionPoint.nextSibling;
-        while (node && node !== instanceStart) {
-          const next = node.nextSibling;
-          if (!retainedNodes.has(node)) {
-            node.remove();
-          }
-          node = next;
-        }
-        
-        // Now check if the item is adjacent (after removing orphans)
-        if (insertionPoint.nextSibling === instanceStart) {
-          insertionPoint = instanceEnd;
-        } else {
-          // Still not adjacent - must move
-          const fragment = instance.extractContent();
-          parentNode.insertBefore(fragment, insertionPoint.nextSibling);
-          insertionPoint = instanceEnd;
-        }
-      }
+      // Reused and stable - we've already cleaned up before it
+      insertionPoint = instanceEnd;
     }
   }
   
-  // Remove any remaining orphaned nodes after the last item
+  // Remove any remaining nodes after the last item up to the boundary
   let node = insertionPoint.nextSibling;
-  while (node) {
+  while (node && node !== endAnchor) {
     const next = node.nextSibling;
-    if (!retainedNodes.has(node)) {
-      node.remove();
-    }
+    node.remove();
     node = next;
   }
   
