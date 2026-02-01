@@ -1,6 +1,6 @@
 # Declarative List Rendering
 
-This document expands Scenario 1 from [declarative-data-sources-and-templated-lists.md](declarative-data-sources-and-templated-lists.md): how to render lists from arrays *without* introducing a dedicated Web Component.
+This document expands Scenario A from [declarative-data-sources-and-templated-lists.md](declarative-data-sources-and-templated-lists.md): how to render lists from arrays *without* introducing a dedicated Web Component.
 
 The goal is to keep templates "HTML-shaped" while still supporting:
 
