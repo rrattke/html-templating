@@ -2,24 +2,44 @@
   "name": "@demo/components",
   "version": "0.1.0",
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./counter": "./src/counter.ts",
-    "./list": "./src/list.ts",
-    "./todo-list": "./src/todo-list.ts",
-    "./data-table": "./src/data-table.ts"
+    ".": {
+      "import": "./lib/index.js",
+      "types": "./lib/index.d.ts"
+    },
+    "./counter": {
+      "import": "./lib/counter.js",
+      "types": "./lib/counter.d.ts"
+    },
+    "./list": {
+      "import": "./lib/list.js",
+      "types": "./lib/list.d.ts"
+    },
+    "./todo-list": {
+      "import": "./lib/todo-list.js",
+      "types": "./lib/todo-list.d.ts"
+    },
+    "./data-table": {
+      "import": "./lib/data-table.js",
+      "types": "./lib/data-table.d.ts"
+    }
   },
+  "files": [
+    "lib"
+  ],
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch"
+    "build": "vite build",
+    "dev": "vite build --watch",
+    "clean": "rm -rf lib"
   },
   "dependencies": {
     "@vanishing/framework": "*"
   },
   "devDependencies": {
     "typescript": "^5.7.3",
-    "vite": "^5.4.21"
+    "vite": "^5.4.21",
+    "vite-plugin-dts": "^4.5.4"
   }
 }

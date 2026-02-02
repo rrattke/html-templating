@@ -42,18 +42,37 @@ The implementation draws inspiration from:
 
 ## Project Structure
 
-- `packages/framework/`: Core templating and reactive framework
-  - `src/template/`: Template instantiation and DOM parts implementation
-  - `src/reactive/`: Signal-based reactivity system
-  - `src/wc/`: Web Components integration
-- `apps/native-signals-example/`: Example using native signals (when available)
-- `apps/solid-signals-example/`: Example using Solid.js signals
+```
+packages/
+  framework/          # Core templating and reactive framework (@vanishing/framework)
+    src/template/     # Template instantiation and DOM parts implementation
+    src/reactive/     # Signal-based reactivity system
+    src/wc/           # Web Components integration
+  demo-components/    # Reusable demo components (@demo/components)
+
+apps/
+  native-signals-example/   # Example using native signals runtime
+  solid-signals-example/    # Example using Solid.js signals
+  static-example/           # Static rendering example (no reactivity)
+```
+
+### Dependency Chain
+
+`@vanishing/framework` → `@demo/components` → example apps
+
+```mermaid
+graph LR
+    A["@vanishing/framework"] --> B["@demo/components"]
+    B --> C["native-signals-example"]
+    B --> D["solid-signals-example"]
+    A --> E["static-example"]
+```
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 24 or later
+- Node.js 22 or later
 - npm 10 or later
 
 ### Installation
@@ -65,38 +84,68 @@ The implementation draws inspiration from:
 npm install
 ```
 
-### Running the Examples
-
-#### Native Signals Example
+1. Build packages (required before first run):
 
 ```bash
-npm run dev -w native-signals-example
+npm run build:packages
 ```
 
-Then open http://localhost:5173 in your browser.
+## Scripts
 
-#### Solid Signals Example
+### Development (with HMR/watch mode)
+
+Development mode continuously rebuilds packages when source files change and runs the Vite dev server with hot module replacement.
 
 ```bash
-npm run dev -w solid-signals-example
+# Full development: watch-build all packages + run native-signals-example
+npm run dev
+
+# Watch-build packages only (for working with apps separately)
+npm run dev:packages
+
+# Run a specific app with package watching
+npm run dev:native   # native-signals-example
+npm run dev:solid    # solid-signals-example  
+npm run dev:static   # static-example
 ```
 
-Then open http://localhost:5173 in your browser.
+### Production (build + preview)
+
+Production mode builds optimized bundles and serves via Vite's preview server.
+
+```bash
+# Build everything and serve native-signals-example
+npm start
+
+# Build packages and serve a specific app
+npm run start:native
+npm run start:solid
+npm run start:static
+```
 
 ### Building
 
-Build all packages and applications:
-
 ```bash
+# Build all packages and apps
 npm run build
+
+# Build only the library packages (framework + demo-components)
+npm run build:packages
+
+# Build a specific workspace
+npm run build -w @vanishing/framework
+npm run build -w @demo/components
+npm run build -w native-signals-example
 ```
 
-Build a specific workspace:
+### Testing
 
 ```bash
-npm run build -w framework
-npm run build -w native-signals-example
-npm run build -w solid-signals-example
+# Run tests across all workspaces
+npm test
+
+# Run tests for a specific package
+npm test -w @vanishing/framework
 ```
 
 ## Status

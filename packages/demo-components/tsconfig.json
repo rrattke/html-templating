@@ -2,7 +2,13 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./lib",
-    "rootDir": "./src"
+    "rootDir": "./src",
+    "moduleResolution": "NodeNext",
+    "paths": {
+      "@vanishing/framework": ["../framework/lib/index.d.ts"],
+      "@vanishing/framework/*": ["../framework/lib/*.d.ts"]
+    }
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "exclude": ["lib"]
 }
