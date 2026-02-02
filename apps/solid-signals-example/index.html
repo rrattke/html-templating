@@ -14,16 +14,18 @@
       body {
         margin: 0;
         min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         padding: 2rem;
+        box-sizing: border-box;
       }
       .demo-shell {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
         gap: 2rem;
-        width: min(960px, 100%);
+        max-width: 800px;
+        margin: 0 auto;
+      }
+      .demo-shell > * {
+        min-width: 0;
       }
     </style>
   </head>
