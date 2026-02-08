@@ -41,7 +41,7 @@ export class StaticBinding {
     return this.#values;
   }
 
-  getTemplate(): Template {
+  get template(): Template {
     return getTemplate(this.#strings);
   }
 
@@ -50,7 +50,7 @@ export class StaticBinding {
    * One-time rendering with no reactive updates.
    */
   render(): DocumentFragment {
-    const template = this.getTemplate();
+    const template = this.template;
     const fragment = template.cloneFragment();
     const parts = createParts(template.descriptors, fragment);
     
@@ -120,7 +120,7 @@ export class DynamicBinding extends StaticBinding {
   }
 
   instance() {
-    return TemplateInstance.create(this.#runtime, this.getTemplate(), this.values);
+    return TemplateInstance.create(this.#runtime, this.template, this.values);
   }
 }
 
@@ -133,15 +133,23 @@ export class TemplateInstance {
   readonly fragment: DocumentFragment;
   readonly parts: Part[];
   readonly #dispose: () => void;
+  readonly template: Template;
   
   // DOM range tracking - where our content lives in the document
   #range: NodeRange;
 
-  constructor(fragment: DocumentFragment, parts: Part[], dispose: () => void, range: NodeRange) {
+  constructor(fragment: DocumentFragment, parts: Part[], dispose: () => void, range: NodeRange, template: Template) {
     this.fragment = fragment;
     this.parts = parts;
     this.#dispose = dispose;
     this.#range = range;
+    this.template = template;
+  }
+
+  update(values: unknown[]): void {
+    this.parts.forEach((part, index) => {
+      part.setValue(values[index]);
+    });
   }
 
   get range(): NodeRange {
@@ -196,7 +204,7 @@ export class TemplateInstance {
       for (const disposer of disposers) {
         disposer();
       }
-    }, range);
+    }, range, template);
 
     // Initialize all parts
     parts.forEach((part, index) => {
@@ -266,10 +274,17 @@ function setupReactiveBinding(
     order: [] as unknown[]
   };
 
-  // Ensure cache is cleaned up when part is disposed
+  // Track current nested instance for single-template optimizations
+  let activeInstance: TemplateInstance | null = null;
+
+  // Ensure cache and active instance are cleaned up when part is disposed
   disposers.push(() => {
     listState.cache.forEach(i => i.dispose());
     listState.cache.clear();
+    if (activeInstance) {
+      activeInstance.dispose();
+      activeInstance = null;
+    }
   });
 
   const dispose = runtime.effect(() => {
@@ -279,6 +294,11 @@ function setupReactiveBinding(
     if (part instanceof NodePart && isListCandidate(result)) {
       const items = Array.from(result);
       if (hasIdentifiableItems(items)) {
+        // Clear active instance if we switch to list
+        if (activeInstance) {
+          activeInstance.dispose();
+          activeInstance = null;
+        }
         reconcileList(items, runtime, part, listState);
         return;
       }
@@ -289,6 +309,31 @@ function setupReactiveBinding(
       listState.cache.forEach(i => i.dispose());
       listState.cache.clear();
       listState.order = [];
+    }
+    
+    // NESTED TEMPLATE RECONCILIATION
+    if (part instanceof NodePart && result instanceof DynamicBinding) {
+      if (activeInstance && activeInstance.template === result.template) {
+        // IDENTITY MATCH: Only update values, keep DOM nodes
+        activeInstance.update(result.values);
+        return;
+      }
+
+      // IDENTITY MISMATCH: Swap out instance
+      if (activeInstance) {
+        activeInstance.dispose();
+      }
+      
+      // Create new instance
+      activeInstance = TemplateInstance.create(runtime, result.template, result.values);
+      part.setValue(activeInstance.fragment);
+      return;
+    }
+
+    // CLEANUP ON PRIMITIVE SWAP
+    if (activeInstance) {
+      activeInstance.dispose();
+      activeInstance = null;
     }
     
     // Standard processing
@@ -359,7 +404,7 @@ function processValue(
 ): unknown {
   // Handle DynamicBinding by instantiating it
   if (value instanceof DynamicBinding) {
-    const instance = TemplateInstance.create(runtime, value.getTemplate(), value.values);
+    const instance = TemplateInstance.create(runtime, value.template, value.values);
     registerCleanup(() => instance.dispose());
     return instance.fragment;
   }
@@ -461,7 +506,7 @@ function collectInstances(
       } else {
         // Create new instance without registering a disposer to the parent list
         // Disposal is handled by the cache cleanup or item removal logic
-        instance = TemplateInstance.create(runtime, item.getTemplate(), item.values, true);
+        instance = TemplateInstance.create(runtime, item.template, item.values, true);
         cache.set(item.id, instance);
       }
 
