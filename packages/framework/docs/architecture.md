@@ -112,59 +112,59 @@ index.ts (main entry - re-exports from all modules)
 ## Complete Dependency Graph
 
 ```text
-                       ┌──────────────────┐
-                       │  reactive/       │
-                       │  signal.ts       │ (leaf - no deps)
-                       └────────┬─────────┘
-                                │
-                       ┌────────▼─────────┐
-                       │  reactive/       │
-                       │  runtime.ts      │
-                       └────────┬─────────┘
-                                │
-            ┌───────────────────┼───────────────────┐
-            │                   │                   │
-   ┌────────▼─────────┐        │           ┌───────▼────────┐
-   │  template/       │        │           │  wc/           │
-   │  dom.ts          │ (leaf) │           │  decorators.ts │
-   └────────┬─────────┘        │           └───────┬────────┘
-            │                  │                   │
-   ┌────────▼─────────┐        │                   │
-   │  template/       │        │                   │
-   │  template.ts     │        │                   │
-   └────────┬─────────┘        │                   │
-            │                  │                   │
-   ┌────────▼─────────┐        │                   │
-   │  template/       │        │                   │
-   │  parts.ts        │        │                   │
-   └────────┬─────────┘        │                   │
-            │                  │                   │
-   ┌────────▼─────────┐◄───────┘                   │
-   │  template/       │                            │
-   │  render.ts       │◄───────────────────────────┘
-   └────────┬─────────┘                            │
-            │                                      │
-   ┌────────▼─────────┐               ┌────────────▼─────────┐
-   │  template/       │               │  wc/                 │
-   │  runtime.ts      │               │  ReactiveElement.ts  │
-   └────────┬─────────┘               └──────────┬───────────┘
-            │                                    │
-            └──────────────┬─────────────────────┘
-                           │
-                  ┌────────▼─────────┐
-                  │  template.ts     │
-                  │  (barrel)        │
-                  └────────┬─────────┘
-                           │
-                  ┌────────▼─────────┐
-                  │  wc.ts           │
-                  │  (barrel)        │
-                  └────────┬─────────┘
-                           │
-                  ┌────────▼─────────┐
-                  │  index.ts        │
-                  │  (main entry)    │
-                  └──────────────────┘
+                    ┌──────────────────┐
+                    │  reactive/       │
+                    │  signal.ts       │ (leaf - no deps)
+                    └────────┬─────────┘
+                             │
+                    ┌────────▼─────────┐
+                    │  reactive/       │
+                    │  runtime.ts      │
+                    └────────┬─────────┘
+                             │
+         ┌───────────────────┼───────────────────┐
+         │                   │                   │
+┌────────▼─────────┐        │           ┌───────▼────────┐
+│  template/       │        │           │  wc/           │
+│  dom.ts          │ (leaf) │           │  decorators.ts │
+└────────┬─────────┘        │           └───────┬────────┘
+         │                  │                   │
+┌────────▼─────────┐        │                   │
+│  template/       │        │                   │
+│  template.ts     │        │                   │
+└────────┬─────────┘        │                   │
+         │                  │                   │
+┌────────▼─────────┐        │                   │
+│  template/       │        │                   │
+│  parts.ts        │        │                   │
+└────────┬─────────┘        │                   │
+         │                  │                   │
+┌────────▼─────────┐◄───────┘                   │
+│  template/       │                            │
+│  render.ts       │◄───────────────────────────┘
+└────────┬─────────┘                            │
+         │                                      │
+┌────────▼─────────┐               ┌────────────▼─────────┐
+│  template/       │               │  wc/                 │
+│  runtime.ts      │               │  ReactiveElement.ts  │
+└────────┬─────────┘               └──────────┬───────────┘
+         │                                    │
+         └──────────────┬─────────────────────┘
+                        │
+               ┌────────▼─────────┐
+               │  template.ts     │
+               │  (barrel)        │
+               └────────┬─────────┘
+                        │
+               ┌────────▼─────────┐
+               │  wc.ts           │
+               │  (barrel)        │
+               └────────┬─────────┘
+                        │
+               ┌────────▼─────────┐
+               │  index.ts        │
+               │  (main entry)    │
+               └──────────────────┘
 ```
 
 ---
@@ -173,11 +173,11 @@ index.ts (main entry - re-exports from all modules)
 
 The template module is organized into three conceptual layers:
 
-| Layer | Module        | Responsibility                                               |
-| ----- | ------------- | ------------------------------------------------------------ |
-| 0     | `dom.ts`      | DOM utilities: `NodeRange`, `buildPath()`, `resolvePath()`   |
-| 1     | `template.ts` | HTML parsing, `Template` class, compile + cache + clone      |
-| 2     | `parts.ts`    | Part implementations + `createParts()` factory               |
+| Layer | Module        | Responsibility                                                      |
+| ----- | ------------- | ------------------------------------------------------------------- |
+| 0     | `dom.ts`      | DOM utilities: `NodeRange`, `buildPath()`, `resolvePath()`          |
+| 1     | `template.ts` | HTML parsing, `Template` class, compile + cache + clone             |
+| 2     | `parts.ts`    | Part implementations + `createParts()` factory                      |
 | 3     | `render.ts`   | `StaticBinding`, `DynamicBinding`, `TemplateInstance`, `Reconciler` |
 
 ---

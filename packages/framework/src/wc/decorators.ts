@@ -1,9 +1,9 @@
-import type { SignalsRuntime } from '../runtime.js';
-import type { Signal } from '../reactive/signal.js';
+import type { SignalsRuntime } from "../runtime.js";
+import type { Signal } from "../reactive/signal.js";
 
 function state<This, Value>(runtime: SignalsRuntime) {
-  return function<This, Value> (
-    target: ClassAccessorDecoratorTarget<This, Value>
+  return function<This, Value>(
+    target: ClassAccessorDecoratorTarget<This, Value>,
   ): ClassAccessorDecoratorResult<This, Value> {
     const { get: getStorage } = target as unknown as ClassAccessorDecoratorTarget<This, Signal<Value>>;
 
@@ -22,19 +22,19 @@ function state<This, Value>(runtime: SignalsRuntime) {
         const signal = getStorage.call(this);
         const [, write] = signal;
         write(value);
-      }
+      },
     };
   };
 }
 
 export const StateDecorator = {
-  with: state
+  with: state,
 };
 
 export function attr(attributeName?: string) {
   return function defineAttribute(
     _target: ClassAccessorDecoratorTarget<HTMLElement, string | null>,
-    context: ClassAccessorDecoratorContext<HTMLElement, string | null>
+    context: ClassAccessorDecoratorContext<HTMLElement, string | null>,
   ): ClassAccessorDecoratorResult<HTMLElement, string | null> {
     const name = attributeName ?? String(context.name).toLowerCase();
 
@@ -51,7 +51,7 @@ export function attr(attributeName?: string) {
         } else {
           this.setAttribute(name, String(value));
         }
-      }
+      },
     };
   };
 }

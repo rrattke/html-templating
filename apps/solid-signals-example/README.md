@@ -4,7 +4,8 @@ This example shows how to consume `@vanishing/framework` while driving updates w
 
 ## Runtime Adapter
 
-The template system only requires a tiny `PartRuntime` interface. We provide `solidRuntime` in `src/runtime/solid-runtime.ts` by wrapping Solid's `createRoot`/`createEffect`, so every template part re-runs inside Solid's reactive graph.
+The template system only requires a tiny `PartRuntime` interface. We provide `solidRuntime` in `src/runtime/solid-runtime.ts` by
+wrapping Solid's `createRoot`/`createEffect`, so every template part re-runs inside Solid's reactive graph.
 
 ## Component Highlights
 

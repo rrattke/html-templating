@@ -5,6 +5,7 @@ This example demonstrates one-time static rendering using `StaticBinding`.
 ## Use Case
 
 When you need to render templates once without any reactive updates:
+
 - Server-side rendering (SSR) hydration targets
 - Static page generation
 - Email templates
@@ -13,14 +14,14 @@ When you need to render templates once without any reactive updates:
 
 ## Key Differences from Dynamic Rendering
 
-| Feature | Static (`StaticBinding`) | Dynamic (`DynamicBinding`) |
-|---------|-------------------------|---------------------------|
-| Class | `StaticBinding` | `DynamicBinding` |
-| Runtime required | No | Yes |
-| Reactive updates | No | Yes (functions wrapped in effects) |
-| Disposal needed | No | Yes (cleanup effects/listeners) |
-| Render method | `.render()` → `DocumentFragment` | `.instance()` → `TemplateInstance` |
-| Nested templates | Rendered immediately | Tracked for disposal |
+| Feature          | Static (`StaticBinding`)         | Dynamic (`DynamicBinding`)         |
+| ---------------- | -------------------------------- | ---------------------------------- |
+| Class            | `StaticBinding`                  | `DynamicBinding`                   |
+| Runtime required | No                               | Yes                                |
+| Reactive updates | No                               | Yes (functions wrapped in effects) |
+| Disposal needed  | No                               | Yes (cleanup effects/listeners)    |
+| Render method    | `.render()` → `DocumentFragment` | `.instance()` → `TemplateInstance` |
+| Nested templates | Rendered immediately             | Tracked for disposal               |
 
 ## Running
 
@@ -31,7 +32,7 @@ npm run dev -w static-example
 ## Code Example
 
 ```typescript
-import { StaticBinding } from '@vanishing/framework/template';
+import { StaticBinding } from "@vanishing/framework/template";
 
 // No runtime needed - just use StaticBinding.html directly
 const html = StaticBinding.html;
@@ -40,7 +41,7 @@ const html = StaticBinding.html;
 const page = html`
   <div>
     <h1>${title}</h1>
-    <ul>${items.map(item => html`<li>${item.name}</li>`)}</ul>
+    <ul>${items.map((item) => html`<li>${item.name}</li>`)}</ul>
   </div>
 `;
 

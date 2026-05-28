@@ -2,7 +2,8 @@
 
 ## Core Concept
 
-The template system manages DOM content through **chunks** - contiguous sequences of nodes that can be uniformly described and manipulated using the NodeRange abstraction.
+The template system manages DOM content through **chunks** - contiguous sequences of nodes that can be uniformly described and
+manipulated using the NodeRange abstraction.
 
 ## Chunk Characteristics
 
@@ -26,6 +27,7 @@ Every chunk in the system has these properties:
 **Key Insight**: Multiple chunks have the same characteristics as a single chunk.
 
 This means:
+
 - A single template fragment is a chunk
 - Each list item is a chunk
 - Multiple list items are just multiple chunks
@@ -36,6 +38,7 @@ This means:
 ### No Artificial Markers Needed
 
 Since chunks are self-describing through their start/end nodes:
+
 - **Only one marker needed**: The initial NodePart comment
 - **List items don't need markers**: They use their first content node as the range start
 - **Reconciliation works uniformly**: Whether moving one chunk or multiple chunks
@@ -58,27 +61,35 @@ NodePart (list with 3 items):
 All chunk operations are instances of these primitives:
 
 ### Extract Chunk
+
 Remove nodes from DOM into a DocumentFragment:
+
 ```typescript
 // From start.nextSibling to end (inclusive)
 const fragment = range.extractContents();
 ```
 
 ### Insert Chunk
+
 Add nodes from a DocumentFragment after a position:
+
 ```typescript
 // After insertionPoint
 parent.insertBefore(fragment, insertionPoint.nextSibling);
 ```
 
 ### Delete Chunk
+
 Remove nodes from DOM:
+
 ```typescript
 range.deleteContents();
 ```
 
 ### Move Chunk
+
 Extract then insert:
+
 ```typescript
 const fragment = range.extractContents();
 parent.insertBefore(fragment, newPosition.nextSibling);
@@ -87,6 +98,7 @@ parent.insertBefore(fragment, newPosition.nextSibling);
 ## Reconciliation Model
 
 List reconciliation is just:
+
 1. Track insertion point (starts at NodePart comment)
 2. For each chunk in new order:
    - If new: insert after insertion point
@@ -111,13 +123,13 @@ NodeRange encapsulates chunk operations:
 
 ```typescript
 class NodeRange {
-  #start: Node;  // Node before content
-  #end: Node;    // Last content node
-  
-  extractContents(): DocumentFragment
-  deleteContents(): void
-  insertNode(content: Node): void
-  setEnd(node: Node): void
+  #start: Node; // Node before content
+  #end: Node; // Last content node
+
+  extractContents(): DocumentFragment;
+  deleteContents(): void;
+  insertNode(content: Node): void;
+  setEnd(node: Node): void;
 }
 ```
 

@@ -3,20 +3,20 @@
  * Layer 3: Manages template instances, bindings, and reconciliation.
  */
 
-import { NodeRange } from './dom.js';
-import { Template, getTemplate } from './template.js';
-import { 
+import { NodeRange } from "./dom.js";
+import { getTemplate, Template } from "./template.js";
+import {
+  createParts,
   EventAttributePart,
   NodePart,
-  createParts,
-  type Part
-} from './parts.js';
-import type { SignalsRuntime } from '../runtime.js';
+  type Part,
+} from "./parts.js";
+import type { SignalsRuntime } from "../runtime.js";
 
 /**
  * Static template binding - holds template strings and values.
  * No runtime needed. Rendered once with render() method.
- * 
+ *
  * @example
  * ```ts
  * const html = StaticBinding.html;
@@ -53,13 +53,13 @@ export class StaticBinding {
     const template = this.template;
     const fragment = template.cloneFragment();
     const parts = createParts(template.descriptors, fragment);
-    
+
     parts.forEach((part, index) => {
       const value = this.#values[index];
       const processed = processValueStatic(value);
       part.setValue(processed);
     });
-    
+
     return fragment;
   }
 
@@ -74,7 +74,7 @@ export class StaticBinding {
 /**
  * Dynamic template binding - extends StaticBinding with runtime and unique id.
  * Used for reactive templates that update when signals change.
- * 
+ *
  * @example
  * ```ts
  * const html = DynamicBinding.with(runtime);
@@ -95,10 +95,14 @@ export class DynamicBinding extends StaticBinding {
    * Creates an html`` tag function bound to a specific runtime.
    * Supports both direct use (html`...`) and identified use (html(id)`...`).
    */
-  static with(runtime: SignalsRuntime): ((strings: readonly string[], ...values: unknown[]) => DynamicBinding) & ((id?: unknown) => (strings: readonly string[], ...values: unknown[]) => DynamicBinding) {
+  static with(
+    runtime: SignalsRuntime,
+  ):
+    & ((strings: readonly string[], ...values: unknown[]) => DynamicBinding)
+    & ((id?: unknown) => (strings: readonly string[], ...values: unknown[]) => DynamicBinding) {
     const htmlFunction = ((stringsOrId?: readonly string[] | unknown, ...values: unknown[]) => {
       // If called as a template tag: html``
-      if (Array.isArray(stringsOrId) && 'raw' in stringsOrId) {
+      if (Array.isArray(stringsOrId) && "raw" in stringsOrId) {
         return new DynamicBinding(stringsOrId as readonly string[], values, runtime);
       }
       // If called as a function: html(id)
@@ -110,7 +114,9 @@ export class DynamicBinding extends StaticBinding {
         }
         return binding;
       };
-    }) as ((strings: readonly string[], ...values: unknown[]) => DynamicBinding) & ((id?: unknown) => (strings: readonly string[], ...values: unknown[]) => DynamicBinding);
+    }) as
+      & ((strings: readonly string[], ...values: unknown[]) => DynamicBinding)
+      & ((id?: unknown) => (strings: readonly string[], ...values: unknown[]) => DynamicBinding);
 
     return htmlFunction;
   }
@@ -134,7 +140,7 @@ export class TemplateInstance {
   readonly parts: Part[];
   readonly #dispose: () => void;
   readonly template: Template;
-  
+
   // DOM range tracking - where our content lives in the document
   #range: NodeRange;
 
@@ -179,7 +185,7 @@ export class TemplateInstance {
    */
   static create(runtime: SignalsRuntime, template: Template, values: unknown[], skipMarker = false): TemplateInstance {
     if (template.descriptors.length !== values.length) {
-      throw new Error('Template part mismatch.');
+      throw new Error("Template part mismatch.");
     }
 
     const fragment = template.cloneFragment();
@@ -194,17 +200,23 @@ export class TemplateInstance {
       range = new NodeRange(fragment.firstChild!, fragment.lastChild!);
     } else {
       // Regular instances: marker as start, last child as end (or marker if empty)
-      const startMarker = document.createComment('');
+      const startMarker = document.createComment("");
       fragment.insertBefore(startMarker, fragment.firstChild);
       range = new NodeRange(startMarker, fragment.lastChild ?? startMarker);
     }
 
     // Create instance first
-    const instance = new TemplateInstance(fragment, parts, () => {
-      for (const disposer of disposers) {
-        disposer();
-      }
-    }, range, template);
+    const instance = new TemplateInstance(
+      fragment,
+      parts,
+      () => {
+        for (const disposer of disposers) {
+          disposer();
+        }
+      },
+      range,
+      template,
+    );
 
     // Initialize all parts
     parts.forEach((part, index) => {
@@ -226,9 +238,9 @@ function processPart(
   part: Part,
   value: unknown,
   runtime: SignalsRuntime,
-  disposers: Array<() => void>
+  disposers: Array<() => void>,
 ): void {
-  if (typeof value === 'function') {
+  if (typeof value === "function") {
     if (part instanceof EventAttributePart) {
       setupEventBinding(part, value as EventListener, disposers);
     } else {
@@ -248,7 +260,7 @@ function processPart(
 function setupEventBinding(
   part: EventAttributePart,
   handler: EventListener,
-  disposers: Array<() => void>
+  disposers: Array<() => void>,
 ): void {
   part.setValue(handler);
   disposers.push(() => part.dispose());
@@ -266,12 +278,12 @@ function setupReactiveBinding(
   part: Part,
   valueFn: () => unknown,
   runtime: SignalsRuntime,
-  disposers: Array<() => void>
+  disposers: Array<() => void>,
 ): void {
   // Keyed list cache for this part
   const listState = {
     cache: new Map<unknown, TemplateInstance>(),
-    order: [] as unknown[]
+    order: [] as unknown[],
   };
 
   // Track current nested instance for single-template optimizations
@@ -279,7 +291,7 @@ function setupReactiveBinding(
 
   // Ensure cache and active instance are cleaned up when part is disposed
   disposers.push(() => {
-    listState.cache.forEach(i => i.dispose());
+    listState.cache.forEach((i) => i.dispose());
     listState.cache.clear();
     if (activeInstance) {
       activeInstance.dispose();
@@ -289,7 +301,7 @@ function setupReactiveBinding(
 
   const dispose = runtime.effect(() => {
     const result = valueFn();
-    
+
     // Optimized path for identified lists
     if (part instanceof NodePart && isListCandidate(result)) {
       const items = Array.from(result);
@@ -303,14 +315,14 @@ function setupReactiveBinding(
         return;
       }
     }
-    
+
     // Cleanup list state if we transitioned out of a list
     if (listState.cache.size > 0) {
-      listState.cache.forEach(i => i.dispose());
+      listState.cache.forEach((i) => i.dispose());
       listState.cache.clear();
       listState.order = [];
     }
-    
+
     // NESTED TEMPLATE RECONCILIATION
     if (part instanceof NodePart && result instanceof DynamicBinding) {
       if (activeInstance && activeInstance.template === result.template) {
@@ -323,7 +335,7 @@ function setupReactiveBinding(
       if (activeInstance) {
         activeInstance.dispose();
       }
-      
+
       // Create new instance
       activeInstance = TemplateInstance.create(runtime, result.template, result.values);
       part.setValue(activeInstance.fragment);
@@ -335,16 +347,16 @@ function setupReactiveBinding(
       activeInstance.dispose();
       activeInstance = null;
     }
-    
+
     // Standard processing
     const processed = processValue(result, runtime, (cleanup) => {
-        // Register cleanup for created instances
-        // We use runtime.onCleanup so it runs when this effect re-runs
-        runtime.onCleanup(cleanup);
+      // Register cleanup for created instances
+      // We use runtime.onCleanup so it runs when this effect re-runs
+      runtime.onCleanup(cleanup);
     });
     part.setValue(processed);
   });
-  
+
   disposers.push(dispose);
 }
 
@@ -359,7 +371,7 @@ function setupStaticPartBinding(
   part: Part,
   value: unknown,
   runtime: SignalsRuntime,
-  disposers: Array<() => void>
+  disposers: Array<() => void>,
 ): void {
   // Static initial value
   // We register cleanup to the instance's disposers list because there is no effect re-run
@@ -383,12 +395,12 @@ function processValueStatic(value: unknown): unknown {
   if (value instanceof StaticBinding) {
     return value.render();
   }
-  
+
   // Handle arrays/iterables recursively
   if (isIterable(value)) {
-    return Array.from(value).map(item => processValueStatic(item));
+    return Array.from(value).map((item) => processValueStatic(item));
   }
-  
+
   // Pass through everything else (nodes, primitives, null, etc.)
   return value;
 }
@@ -398,9 +410,9 @@ function processValueStatic(value: unknown): unknown {
  * Registers disposal of created instances.
  */
 function processValue(
-  value: unknown, 
-  runtime: SignalsRuntime, 
-  registerCleanup: (cleanup: () => void) => void
+  value: unknown,
+  runtime: SignalsRuntime,
+  registerCleanup: (cleanup: () => void) => void,
 ): unknown {
   // Handle DynamicBinding by instantiating it
   if (value instanceof DynamicBinding) {
@@ -408,17 +420,17 @@ function processValue(
     registerCleanup(() => instance.dispose());
     return instance.fragment;
   }
-  
+
   // Handle StaticBinding by rendering it (allows mixing static in dynamic templates)
   if (value instanceof StaticBinding) {
     return value.render();
   }
-  
+
   // Handle arrays/iterables recursively
   if (isIterable(value)) {
-    return Array.from(value).map(item => processValue(item, runtime, registerCleanup));
+    return Array.from(value).map((item) => processValue(item, runtime, registerCleanup));
   }
-  
+
   // Pass through everything else (nodes, primitives, null, etc.)
   return value;
 }
@@ -449,20 +461,20 @@ interface ListEntry {
  * Optimized to minimize DOM moves using the LIS algorithm.
  */
 function reconcileList(
-  items: unknown[], 
-  runtime: SignalsRuntime, 
+  items: unknown[],
+  runtime: SignalsRuntime,
   part: NodePart,
-  state: ListState
+  state: ListState,
 ): void {
   const range = part.range;
   const newOrder: unknown[] = [];
-  
+
   // 1. Collect instances and determine reuse
   const { entries, currentIds } = collectInstances(
-    runtime, 
-    items, 
-    state.cache, 
-    newOrder
+    runtime,
+    items,
+    state.cache,
+    newOrder,
   );
 
   // 2. Remove unused instances
@@ -473,9 +485,9 @@ function reconcileList(
     range,
     entries,
     state,
-    newOrder
+    newOrder,
   );
-  
+
   // Update state for next render
   state.order = newOrder;
 }
@@ -488,8 +500,8 @@ function collectInstances(
   runtime: SignalsRuntime,
   items: unknown[],
   cache: Map<unknown, TemplateInstance>,
-  newOrder: unknown[]
-): { entries: ListEntry[], currentIds: Set<unknown> } {
+  newOrder: unknown[],
+): { entries: ListEntry[]; currentIds: Set<unknown>; } {
   const entries: ListEntry[] = [];
   const currentIds = new Set<unknown>();
 
@@ -497,10 +509,10 @@ function collectInstances(
     if (item instanceof DynamicBinding && item.id !== undefined) {
       currentIds.add(item.id);
       newOrder.push(item.id);
-      
+
       let instance = cache.get(item.id);
       let reused = false;
-      
+
       if (instance) {
         reused = true;
       } else {
@@ -513,7 +525,7 @@ function collectInstances(
       entries.push({ instance, reused, id: item.id });
     }
   }
-  
+
   return { entries, currentIds };
 }
 
@@ -522,7 +534,7 @@ function collectInstances(
  */
 function cleanupRemovedInstances(
   cache: Map<unknown, TemplateInstance>,
-  currentIds: Set<unknown>
+  currentIds: Set<unknown>,
 ): void {
   for (const [id, instance] of cache) {
     if (!currentIds.has(id)) {
@@ -540,11 +552,11 @@ function commitReconciliation(
   range: NodeRange,
   entries: ListEntry[],
   state: ListState,
-  newOrder: unknown[]
+  newOrder: unknown[],
 ): void {
   const needsMove = computeItemsToMove(state.order, newOrder);
   const movingFragments = extractMovingFragments(entries, needsMove);
-  
+
   let insertionPoint = range.start;
   const parentNode = range.start.parentNode!;
   const endAnchor = range.end.nextSibling;
@@ -552,7 +564,7 @@ function commitReconciliation(
   for (const { instance, reused, id } of entries) {
     const instanceStart = instance.range.start;
     const instanceEnd = instance.range.end;
-    
+
     // Clean up garbage nodes before the next item
     if (reused && !needsMove.has(id)) {
       NodeRange.removeNodes(insertionPoint, instanceStart);
@@ -567,10 +579,10 @@ function commitReconciliation(
       parentNode.insertBefore(fragment, insertionPoint.nextSibling);
     }
     // Else: reused and not moved, already in place
-    
+
     insertionPoint = instanceEnd;
   }
-  
+
   // Remove trailing garbage
   NodeRange.removeNodes(insertionPoint, endAnchor);
 
@@ -586,8 +598,8 @@ function commitReconciliation(
  * Extracts content for items that need to be moved to preserve state.
  */
 function extractMovingFragments(
-  entries: ListEntry[], 
-  needsMove: Set<unknown>
+  entries: ListEntry[],
+  needsMove: Set<unknown>,
 ): Map<unknown, DocumentFragment> {
   const movingFragments = new Map<unknown, DocumentFragment>();
   for (const { instance, reused, id } of entries) {
@@ -608,7 +620,7 @@ function computeItemsToMove(oldOrder: unknown[], newOrder: unknown[]): Set<unkno
   for (let i = 0; i < oldOrder.length; i++) {
     oldIndexMap.set(oldOrder[i], i);
   }
-  
+
   // Get indices in old array for each item in new array
   const oldIndices: number[] = [];
   const newKeys: unknown[] = [];
@@ -618,11 +630,11 @@ function computeItemsToMove(oldOrder: unknown[], newOrder: unknown[]): Set<unkno
       newKeys.push(key);
     }
   }
-  
+
   // Find longest increasing subsequence - these items don't need to move
   const lis = longestIncreasingSubsequence(oldIndices);
   const stableIndices = new Set(lis);
-  
+
   // Items not in the LIS need to move
   const needsMove = new Set<unknown>();
   for (let i = 0; i < oldIndices.length; i++) {
@@ -630,21 +642,21 @@ function computeItemsToMove(oldOrder: unknown[], newOrder: unknown[]): Set<unkno
       needsMove.add(newKeys[i]);
     }
   }
-  
+
   return needsMove;
 }
 
 /**
  * Computes the Longest Increasing Subsequence (LIS) of an array of numbers.
  * The function returns the *indices* of the items that make up the subsequence.
- * This is used for list reconciliation to find the largest set of items that stay 
+ * This is used for list reconciliation to find the largest set of items that stay
  * in relative order, allowing us to move only the remaining items.
- * 
+ *
  * Algorithm: O(n log n) using binary search (patience sorting variant).
- * 
+ *
  * @param arr The input array of numbers (e.g., indices from the old list).
  * @return An array of *indices from the input array* that form the LIS.
- * 
+ *
  * @example
  * // Input values: [10, 20, 5, 30]
  * // Indices:      [0,  1,  2, 3]
@@ -654,14 +666,14 @@ function computeItemsToMove(oldOrder: unknown[], newOrder: unknown[]): Set<unkno
  */
 export function longestIncreasingSubsequence(arr: number[]): number[] {
   const n = arr.length;
-  if (n === 0) return [];
-  
+  if (n === 0) { return []; }
+
   const result: number[] = [];
   const p = new Int32Array(n);
-  
+
   for (let i = 0; i < n; i++) {
     const val = arr[i];
-    
+
     if (result.length === 0 || val > arr[result[result.length - 1]]) {
       if (result.length > 0) {
         p[i] = result[result.length - 1];
@@ -669,7 +681,7 @@ export function longestIncreasingSubsequence(arr: number[]): number[] {
       result.push(i);
       continue;
     }
-    
+
     let u = 0;
     let v = result.length - 1;
     while (u < v) {
@@ -680,7 +692,7 @@ export function longestIncreasingSubsequence(arr: number[]): number[] {
         v = c;
       }
     }
-    
+
     if (val < arr[result[u]]) {
       if (u > 0) {
         p[i] = result[u - 1];
@@ -688,14 +700,14 @@ export function longestIncreasingSubsequence(arr: number[]): number[] {
       result[u] = i;
     }
   }
-  
+
   let u = result.length;
   let v = result[u - 1];
   while (u-- > 0) {
     result[u] = v;
     v = p[v];
   }
-  
+
   return result;
 }
 
@@ -703,12 +715,12 @@ export function longestIncreasingSubsequence(arr: number[]): number[] {
  * Checks if a list contains identifiable DynamicBindings.
  */
 function hasIdentifiableItems(items: unknown[]): boolean {
-  return items.some(item => item instanceof DynamicBinding && item.id !== undefined);
+  return items.some((item) => item instanceof DynamicBinding && item.id !== undefined);
 }
 
 function isIterable(value: unknown): value is Iterable<unknown> {
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     return false;
   }
-  return value != null && typeof (value as Iterable<unknown>)[Symbol.iterator] === 'function';
+  return value != null && typeof (value as Iterable<unknown>)[Symbol.iterator] === "function";
 }

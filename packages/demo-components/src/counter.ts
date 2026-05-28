@@ -1,11 +1,12 @@
-import { Styleable, Reactive, state } from '@vanishing/framework/wc';
-import { html } from '@vanishing/framework/template';
-import styles from './counter.css?inline';
+import { Reactive, state, Styleable } from "@vanishing/framework/wc";
+import { html } from "@vanishing/framework/template";
+import styles from "./counter.css?inline";
 
 export class Counter extends Styleable(Reactive(HTMLElement)) {
   static styles = styles;
-  
-  @state accessor count = 0;
+
+  @state
+  accessor count = 0;
 
   template() {
     return html`
@@ -20,4 +21,4 @@ export class Counter extends Styleable(Reactive(HTMLElement)) {
   }
 }
 
-customElements.define('demo-counter', Counter);
+customElements.define("demo-counter", Counter);

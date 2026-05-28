@@ -4,23 +4,29 @@ An experimental web framework exploring the intersection of emerging web standar
 
 ## Background
 
-The modern web platform has a significant gap when it comes to reactive templating and state management. While frameworks like React, Vue, and Solid have demonstrated the value of reactive primitives and efficient DOM updates, these capabilities haven't been available as native web standards—until now.
+The modern web platform has a significant gap when it comes to reactive templating and state management. While frameworks like
+React, Vue, and Solid have demonstrated the value of reactive primitives and efficient DOM updates, these capabilities haven't been
+available as native web standards—until now.
 
 ### The Standards Gap
 
 Currently, web developers face two key challenges:
 
-1. **Templating**: While the platform provides basic templating through `<template>` elements, there's no standard way to efficiently update parts of instantiated templates when data changes.
+1. **Templating**: While the platform provides basic templating through `<template>` elements, there's no standard way to
+   efficiently update parts of instantiated templates when data changes.
 
-2. **Reactivity/Signals**: There's no native way to create reactive state that automatically triggers UI updates when values change. This has led to countless framework-specific implementations.
+2. **Reactivity/Signals**: There's no native way to create reactive state that automatically triggers UI updates when values change.
+   This has led to countless framework-specific implementations.
 
 ### Emerging Standards
 
 This project is inspired by and aligned with emerging web standards that aim to close these gaps:
 
-- **[DOM Parts](https://github.com/WICG/webcomponents/blob/gh-pages/proposals/DOM-Parts.md)**: A proposal for efficiently marking and updating specific parts of the DOM tree, enabling frameworks to surgically update only the parts that need to change.
+- **[DOM Parts](https://github.com/WICG/webcomponents/blob/gh-pages/proposals/DOM-Parts.md)**: A proposal for efficiently marking
+  and updating specific parts of the DOM tree, enabling frameworks to surgically update only the parts that need to change.
 
-- **[Signals Standard](https://github.com/proposal-signals/proposal-signals)**: A TC39 proposal bringing reactive primitives to JavaScript, providing a standard way to create observable values that notify when they change.
+- **[Signals Standard](https://github.com/proposal-signals/proposal-signals)**: A TC39 proposal bringing reactive primitives to
+  JavaScript, providing a standard way to create observable values that notify when they change.
 
 These standards promise to enable lightweight, framework-less reactive applications with near-native performance.
 
@@ -150,7 +156,8 @@ npm test -w @vanishing/framework
 
 ## Status
 
-This is an experimental project exploring future web standards. The APIs and implementation are subject to change as the underlying standards evolve.
+This is an experimental project exploring future web standards. The APIs and implementation are subject to change as the underlying
+standards evolve.
 
 ## Learn More
 

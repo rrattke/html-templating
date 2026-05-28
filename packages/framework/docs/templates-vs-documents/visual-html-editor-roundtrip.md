@@ -1,6 +1,7 @@
 # Visual HTML Editor Roundtrip (DOM ↔ Model)
 
-This document expands Scenario B from [../templates-vs-documents.md](../templates-vs-documents.md): a workflow where users *author* a plot/chart visually and the persisted output is **HTML**.
+This document expands Scenario B from [../templates-vs-documents.md](../templates-vs-documents.md): a workflow where users *author*
+a plot/chart visually and the persisted output is **HTML**.
 
 The core challenge is the **roundtrip**:
 
@@ -87,24 +88,24 @@ type PlotDocV1 = {
 };
 
 export function parsePlotDoc(root: ParentNode): PlotDocV1 {
-  const plot = root.querySelector('x-plot[data-doc="vanishing-plot"]');
-  if (!plot) throw new Error('No plot document root found');
+  const plot = root.querySelector("x-plot[data-doc=\"vanishing-plot\"]");
+  if (!plot) { throw new Error("No plot document root found"); }
 
-  const version = Number(plot.getAttribute('data-version') ?? '1');
-  if (version !== 1) throw new Error(`Unsupported version: ${version}`);
+  const version = Number(plot.getAttribute("data-version") ?? "1");
+  if (version !== 1) { throw new Error(`Unsupported version: ${version}`); }
 
-  const signals = Array.from(plot.querySelectorAll(':scope > x-signal')).map(el => {
-    const id = el.getAttribute('data-id');
-    const src = el.getAttribute('src');
-    if (!id || !src) throw new Error('Signal missing data-id or src');
+  const signals = Array.from(plot.querySelectorAll(":scope > x-signal")).map((el) => {
+    const id = el.getAttribute("data-id");
+    const src = el.getAttribute("src");
+    if (!id || !src) { throw new Error("Signal missing data-id or src"); }
 
-    const cfg = el.querySelector('script[type="application/json"][data-config]');
+    const cfg = el.querySelector("script[type=\"application/json\"][data-config]");
     const config = cfg?.textContent?.trim() ? JSON.parse(cfg.textContent) : undefined;
 
     return {
       id,
       src,
-      color: el.getAttribute('color') ?? undefined,
+      color: el.getAttribute("color") ?? undefined,
       config,
     };
   });
@@ -123,20 +124,20 @@ Sketch:
 
 ```ts
 export function renderPlotDoc(model: PlotDocV1, doc = document): HTMLElement {
-  const plot = doc.createElement('x-plot');
-  plot.setAttribute('data-doc', 'vanishing-plot');
-  plot.setAttribute('data-version', String(model.version));
+  const plot = doc.createElement("x-plot");
+  plot.setAttribute("data-doc", "vanishing-plot");
+  plot.setAttribute("data-version", String(model.version));
 
   for (const s of model.signals) {
-    const el = doc.createElement('x-signal');
-    el.setAttribute('data-id', s.id);
-    el.setAttribute('src', s.src);
-    if (s.color) el.setAttribute('color', s.color);
+    const el = doc.createElement("x-signal");
+    el.setAttribute("data-id", s.id);
+    el.setAttribute("src", s.src);
+    if (s.color) { el.setAttribute("color", s.color); }
 
     if (s.config) {
-      const script = doc.createElement('script');
-      script.type = 'application/json';
-      script.setAttribute('data-config', '');
+      const script = doc.createElement("script");
+      script.type = "application/json";
+      script.setAttribute("data-config", "");
       script.textContent = JSON.stringify(s.config);
       el.appendChild(script);
     }

@@ -1,4 +1,4 @@
-import type { Signal, Memo } from './reactive/signal.js';
+import type { Memo, Signal } from "./reactive/signal.js";
 
 export interface SignalsRuntime {
   createSignal<T>(initialValue: T): Signal<T>;

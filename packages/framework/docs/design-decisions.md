@@ -1,6 +1,7 @@
 # Design Decisions
 
-This document captures the core design philosophy, goals, and key architectural decisions that shaped this framework. It serves as the canonical reference for understanding *why* the framework works the way it does.
+This document captures the core design philosophy, goals, and key architectural decisions that shaped this framework. It serves as
+the canonical reference for understanding *why* the framework works the way it does.
 
 ---
 
@@ -8,7 +9,9 @@ This document captures the core design philosophy, goals, and key architectural 
 
 ### The "Vanishing Framework" Concept
 
-A vanishing framework is one where the development tools and libraries are either compiled away or are so lightweight that they "vanish," leaving behind code that is very close to native browser standards. As browsers adopt new APIs like Signals and DOM Parts, the small libraries we use today will be replaced by native browser commands, making the framework truly "vanish."
+A vanishing framework is one where the development tools and libraries are either compiled away or are so lightweight that they
+"vanish," leaving behind code that is very close to native browser standards. As browsers adopt new APIs like Signals and DOM Parts,
+the small libraries we use today will be replaced by native browser commands, making the framework truly "vanish."
 
 ### Core Goals
 
@@ -72,8 +75,7 @@ Use SolidJS signals or a minimal clone:
 - Dependency tracking at read-time
 - Synchronous, fine-grained updates
 
-**Reactivity is responsible for *when* updates happen.**
-**The template engine is responsible for *where* updates go.**
+**Reactivity is responsible for *when* updates happen.** **The template engine is responsible for *where* updates go.**
 
 ### 3.3 Integration Layer
 
@@ -144,8 +146,8 @@ The framework uses a strict three-layer architecture that separates concerns cle
 const template = getTemplate(strings);
 const fragment = template.cloneFragment();
 const parts = createParts(template.descriptors, fragment);
-parts[0].setValue("Hello");       // Just applies value
-parts[1].setValue(42);            // Just applies value
+parts[0].setValue("Hello"); // Just applies value
+parts[1].setValue(42); // Just applies value
 container.appendChild(fragment);
 
 // Binding usage (with reactivity and keying)
@@ -167,7 +169,7 @@ class NodePart {
 // Reconciliation is a separate concern
 class Reconciler {
   #instances: Map<unknown, InstanceState> = new Map();
-  
+
   reconcile(bindings: DynamicBinding[]): void {
     // Track by key, reuse or create instances
     // Call part.setValue() with the realized nodes
@@ -179,15 +181,15 @@ class Reconciler {
 
 ## 5. Key Terminology
 
-| Term                 | Definition                                                                                                 |
-| -------------------- | ---------------------------------------------------------------------------------------------------------- |
-| **Template**         | Compiled template structure (cached by template strings). Created immediately in `html\`...\``. Immutable. |
-| **Part**             | Applies a value to a DOM location. Stateless. No knowledge of keys or reconciliation.                     |
+| Term                 | Definition                                                                                                           |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **Template**         | Compiled template structure (cached by template strings). Created immediately in `html\`...\``. Immutable.           |
+| **Part**             | Applies a value to a DOM location. Stateless. No knowledge of keys or reconciliation.                                |
 | **DynamicBinding**   | Render specification: Template reference + values array + optional key + runtime. Ephemeral, created on each render. |
-| **TemplateInstance** | Realized DOM: fragment + parts + dispose(). Has behavior. Created when binding is instantiated.           |
-| **InstanceState**    | Reconciliation bookkeeping: key + NodeRange + dispose. Managed by Reconciler.                             |
-| **Reconciler**       | Tracks InstanceState by key. Decides create/reuse/dispose. Orchestrates DOM moves.                        |
-| **NodeRange**        | Tracks a contiguous sequence of DOM nodes using exclusive start marker and inclusive end node.             |
+| **TemplateInstance** | Realized DOM: fragment + parts + dispose(). Has behavior. Created when binding is instantiated.                      |
+| **InstanceState**    | Reconciliation bookkeeping: key + NodeRange + dispose. Managed by Reconciler.                                        |
+| **Reconciler**       | Tracks InstanceState by key. Decides create/reuse/dispose. Orchestrates DOM moves.                                   |
+| **NodeRange**        | Tracks a contiguous sequence of DOM nodes using exclusive start marker and inclusive end node.                       |
 
 ---
 
@@ -214,7 +216,8 @@ This breaks:
 
 **The problem is the fragment-based batch update, not key management.**
 
-The key is correctly stored on `DynamicBinding` (user intent) and should be copied to a tracked instance for reconciliation. The fix is changing *how* we update the DOM, not *where* we store keys.
+The key is correctly stored on `DynamicBinding` (user intent) and should be copied to a tracked instance for reconciliation. The fix
+is changing *how* we update the DOM, not *where* we store keys.
 
 ### Solution: In-Place DOM Moves
 
@@ -276,11 +279,14 @@ class Reconciler {
 
 The web standards bodies are actively working on a two-part native solution:
 
-- **DOM Parts API**: A proposed browser API that allows developers to mark specific parts of the DOM as "dynamic holes." This provides a highly efficient, low-level way to update content without re-parsing HTML.
+- **DOM Parts API**: A proposed browser API that allows developers to mark specific parts of the DOM as "dynamic holes." This
+  provides a highly efficient, low-level way to update content without re-parsing HTML.
 
-- **TC39 Signals Proposal**: A native JavaScript primitive for reactivity. A `Signal` is an object that can notify interested parties when its value changes.
+- **TC39 Signals Proposal**: A native JavaScript primitive for reactivity. A `Signal` is an object that can notify interested
+  parties when its value changes.
 
-When combined, these will allow for a "Push" model: a `Signal`'s value changes, and it directly tells the corresponding `DOM Part` to update itself, which is extremely performant.
+When combined, these will allow for a "Push" model: a `Signal`'s value changes, and it directly tells the corresponding `DOM Part`
+to update itself, which is extremely performant.
 
 Our framework is designed to be easily migrated to these native APIs when they become available.
 
@@ -289,6 +295,7 @@ Our framework is designed to be easily migrated to these native APIs when they b
 ## 9. Implementation Priorities
 
 ### Phase 1 — Core
+
 - `html` tagged template
 - Template record caching
 - Comment marker insertion
@@ -299,6 +306,7 @@ Our framework is designed to be easily migrated to these native APIs when they b
 - Integration of signals → parts
 
 ### Phase 2 — Extensions
+
 - AttributePart
 - PropertyPart
 - EventPart
@@ -306,6 +314,7 @@ Our framework is designed to be easily migrated to these native APIs when they b
 - Web Component base class
 
 ### Phase 3 — Optional Enhancements
+
 - Keyed lists with reconciliation
 - SSR-friendly template records
 
@@ -339,10 +348,11 @@ Provide decorators for:
 Example:
 
 ```js
-@state count = 0;
-@attr title;
+count = 0;
+title;
 ```
 
 ---
 
-*Use this document as the canonical reference for understanding the design philosophy and architectural decisions in this repository.*
+*Use this document as the canonical reference for understanding the design philosophy and architectural decisions in this
+repository.*

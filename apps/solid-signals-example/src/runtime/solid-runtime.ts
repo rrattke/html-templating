@@ -1,17 +1,17 @@
-import { 
-  createEffect, 
-  createRoot, 
-  createSignal as solidCreateSignal,
-  createMemo as solidCreateMemo,
+import {
   batch as solidBatch,
+  createEffect,
+  createMemo as solidCreateMemo,
+  createRoot,
+  createSignal as solidCreateSignal,
+  onCleanup as solidOnCleanup,
   untrack as solidUntrack,
-  onCleanup as solidOnCleanup
-} from 'solid-js';
-import { SignalsRuntime } from '@vanishing/framework/runtime';
+} from "solid-js";
+import { SignalsRuntime } from "@vanishing/framework/runtime";
 
 export const solidRuntime: SignalsRuntime = {
   effect(run) {
-    return createRoot(dispose => {
+    return createRoot((dispose) => {
       createEffect(run);
       return dispose;
     });
@@ -30,5 +30,5 @@ export const solidRuntime: SignalsRuntime = {
   },
   onCleanup(fn) {
     solidOnCleanup(fn);
-  }
+  },
 };

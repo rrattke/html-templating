@@ -2,7 +2,9 @@
 
 ## Overview
 
-The list reconciliation algorithm efficiently updates keyed lists in the DOM by minimizing node movements and re-insertions. When a reactive list changes, the algorithm determines which items need to move and which can stay in place, avoiding unnecessary DOM mutations.
+The list reconciliation algorithm efficiently updates keyed lists in the DOM by minimizing node movements and re-insertions. When a
+reactive list changes, the algorithm determines which items need to move and which can stay in place, avoiding unnecessary DOM
+mutations.
 
 ## Key Concepts
 
@@ -12,32 +14,34 @@ A keyed list consists of `DynamicBinding` instances where each has a unique `key
 
 ```typescript
 const items = [
-  { id: 'a', label: 'Item A' },
-  { id: 'b', label: 'Item B' },
-  { id: 'c', label: 'Item C' }
+  { id: "a", label: "Item A" },
+  { id: "b", label: "Item B" },
+  { id: "c", label: "Item C" },
 ];
 
-html`<ul>${() => items.map(item => 
-  html(item.id)`<li>${item.label}</li>`
-)}</ul>`;
+html`<ul>${() => items.map((item) => html(item.id)`<li>${item.label}</li>`)}</ul>`;
 ```
 
-The `html(item.id)` syntax creates a keyed template - the key allows the reconciliation algorithm to track which item is which across updates.
+The `html(item.id)` syntax creates a keyed template - the key allows the reconciliation algorithm to track which item is which
+across updates.
 
 ### Template Instance Tracking
 
 Each keyed item gets its own `TemplateInstance`. Unlike non-keyed lists, keyed instances are:
+
 - **Stored by key** in a localized cache within the render effect (not on the parent instance)
 - **Reused** across updates if the key still exists
 - **Created without a marker node** (using `skipMarker=true`) to reduce DOM overhead
 
-List items use their first content node as the range start instead of creating an extra Comment marker node. This localized tracking prevents key collisions between sibling lists and avoids memory leaks from retained children.
+List items use their first content node as the range start instead of creating an extra Comment marker node. This localized tracking
+prevents key collisions between sibling lists and avoids memory leaks from retained children.
 
 ## Algorithm Phases
 
 ### Phase 1: Collect Instances
 
 For each item in the new list:
+
 1. Extract its key from the `DynamicBinding`
 2. Look up existing instance by key in the local `state.cache`
 3. If found, reuse it; otherwise create new instance and add to cache
@@ -49,8 +53,8 @@ for (const item of items) {
     let instance = state.cache.get(item.key);
     // Reuse or create...
     if (!instance) {
-       instance = TemplateInstance.create(runtime, item.getTemplate(), item.values, true);
-       state.cache.set(item.key, instance);
+      instance = TemplateInstance.create(runtime, item.getTemplate(), item.values, true);
+      state.cache.set(item.key, instance);
     }
     entries.push({ instance, reused: !!instance, key: item.key });
     newKeyOrder.push(item.key);
@@ -68,6 +72,7 @@ Uses the **Longest Increasing Subsequence (LIS)** algorithm to determine which i
 4. Items NOT in the LIS need to move
 
 **Example:**
+
 ```
 Old order: [A, B, C, D]  (indices: 0, 1, 2, 3)
 New order: [C, A, B, D]
@@ -82,7 +87,8 @@ This is optimal - we move the minimum number of items needed.
 
 ### Phase 3: Extract Movers
 
-Before modifying the DOM structure, we perform an extraction pass. Any item identified as "needs move" is extracted into a DocumentFragment. This simplifies the insertion phase by treating moves and new insertions identically.
+Before modifying the DOM structure, we perform an extraction pass. Any item identified as "needs move" is extracted into a
+DocumentFragment. This simplifies the insertion phase by treating moves and new insertions identically.
 
 ```typescript
 const movedFragments = new Map<unknown, DocumentFragment>();
@@ -95,14 +101,15 @@ for (const { instance, reused, key } of entries) {
 
 ### Phase 4: Reconcile DOM
 
-Walk through the new order, maintaining an `insertionPoint` that tracks where to insert next. We handle "garbage" (nodes that shouldn't be there) inline during this pass.
+Walk through the new order, maintaining an `insertionPoint` that tracks where to insert next. We handle "garbage" (nodes that
+shouldn't be there) inline during this pass.
 
 ```typescript
 for (const { instance, reused, key } of entries) {
   // 1. Clean up garbage: remove nodes between insertionPoint and current item start
   //    (Only if item is reused and didn't move - moving items are already out)
   if (reused && !needsMove.has(key)) {
-     removeNodesBetween(insertionPoint, instance.range.start);
+    removeNodesBetween(insertionPoint, instance.range.start);
   }
 
   // 2. Insert if needed
@@ -114,7 +121,7 @@ for (const { instance, reused, key } of entries) {
     const fragment = movedFragments.get(key)!;
     parentNode.insertBefore(fragment, insertionPoint.nextSibling);
   }
-  
+
   // 3. Advance insertionPoint to end of current item
   insertionPoint = instance.range.end;
 }
@@ -166,21 +173,26 @@ This saves one Comment node per list item, reducing DOM overhead.
 ## Performance Characteristics
 
 ### Memory Optimization
+
 - **Localized State**: Key tracking happens in `reconcileKeyedList` loop state, not on the parent `TemplateInstance` object.
 - **Reference Cleanup**: When a list is removed or replaced, the local `Map` is garbage collected immediately.
-- **No array allocations per instance**: Previous versions allocated `children` arrays for every template instance (even non-lists). This is now 0 bytes for non-list instances.
+- **No array allocations per instance**: Previous versions allocated `children` arrays for every template instance (even non-lists).
+  This is now 0 bytes for non-list instances.
 
 ### Time Complexity
+
 - **LIS Calculation**: O(n log n) - Uses binary search on result tails.
 - **DOM Access**: O(n) - Single pass over the new list.
 - **Reconciliation**: O(n) - We touch each item exactly once in the main loop.
 
 ### Space Complexity
+
 - O(n) for the `cache` Map (stores active instances).
 - O(n) for `newKeyOrder` array.
 - 0 additional overhead for non-keyed items.
 
 ### DOM Mutations
+
 - **Moves**: Only items not in the Longest Increasing Subsequence are moved.
 - **Insertions**: New items are inserted directly.
 - **Deletions**: Handled inline during the walk (removes gaps) or at the end (removes trailing nodes).
@@ -189,11 +201,13 @@ This saves one Comment node per list item, reducing DOM overhead.
 ### What Gets Moved
 
 Given this transformation:
+
 ```
 [A, B, C, D, E] → [E, A, B, C, D]
 ```
 
 The algorithm:
+
 1. Finds LIS: [A, B, C, D] (indices 1, 2, 3, 4 in new array)
 2. Moves only: E
 3. Leaves in place: A, B, C, D
@@ -203,6 +217,7 @@ This is optimal - we can't do better than moving 1 item.
 ## Edge Cases
 
 ### Empty List
+
 ```typescript
 if (entries.length === 0) {
   range.setEnd(range.start); // Collapsed range
@@ -210,13 +225,17 @@ if (entries.length === 0) {
 ```
 
 ### All Items Removed
+
 Cleanup phase removes all nodes between `insertionPoint` and old `range.end`.
 
 ### All Items New
+
 All items go through the "new item" path, no extractions happen.
 
 ### Reordering Without Moves
+
 If new order maintains relative positions (e.g., inserting at front/back), many items stay in place:
+
 ```
 [A, B, C] → [X, A, B, C] 
 // Only X is new, A, B, C stay in place
@@ -229,7 +248,7 @@ The reconciliation is triggered from `TemplateInstance.create()` effect:
 ```typescript
 runtime.effect(() => {
   const result = value();
-  
+
   if (part instanceof NodePart && isIterable(result)) {
     const items = Array.from(result);
     if (hasKeyedItems(items)) {
@@ -237,7 +256,7 @@ runtime.effect(() => {
       return;
     }
   }
-  
+
   // Fallback to standard processing
   const processed = processValue(result, runtime, instance);
   part.setValue(processed);

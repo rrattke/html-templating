@@ -1,3 +1,3 @@
-export { Reactive, type ReactiveInstance } from './reactive.js';
-export { StateDecorator, attr } from './decorators.js';
-export { Styleable, type StyleableStatic, type StyleableInstance } from './styleable.js';
+export { Reactive, type ReactiveInstance } from "./reactive.js";
+export { attr, StateDecorator } from "./decorators.js";
+export { Styleable, type StyleableInstance, type StyleableStatic } from "./styleable.js";

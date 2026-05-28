@@ -1,6 +1,7 @@
 # Web Components: Mixins (`Reactive`, `Styleable`)
 
-This document explains the preferred authoring style for Web Components in this repo: compose behavior via mixins rather than a deep base-class hierarchy.
+This document explains the preferred authoring style for Web Components in this repo: compose behavior via mixins rather than a deep
+base-class hierarchy.
 
 ---
 
@@ -13,7 +14,7 @@ You can compose them:
 
 ```ts
 class MyEl extends Styleable(Reactive(HTMLElement)) {
-  static styles = 'button { color: red; }';
+  static styles = "button { color: red; }";
   template() {
     return html`<button>Click</button>`;
   }

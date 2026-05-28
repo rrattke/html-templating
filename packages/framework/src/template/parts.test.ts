@@ -3,12 +3,12 @@
  * This file contains helper functions for creating test fixtures and assertions.
  */
 
-import { TextTemplate } from './parts.js';
+import { TextTemplate } from "./parts.js";
 
 /**
  * Creates a test element with the specified tag name.
  */
-export function createTestElement(tag: string = 'div'): Element {
+export function createTestElement(tag: string = "div"): Element {
   return document.createElement(tag);
 }
 
@@ -22,11 +22,11 @@ export function createTextTemplate(strings: string[]): TextTemplate {
 /**
  * Helper to create a spy function for event listeners.
  */
-export function createEventSpy(): EventListener & { calls: Event[] } {
+export function createEventSpy(): EventListener & { calls: Event[]; } {
   const calls: Event[] = [];
   const spy = ((event: Event) => {
     calls.push(event);
-  }) as EventListener & { calls: Event[] };
+  }) as EventListener & { calls: Event[]; };
   spy.calls = calls;
   return spy;
 }

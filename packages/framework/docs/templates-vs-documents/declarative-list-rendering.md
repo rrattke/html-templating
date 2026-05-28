@@ -1,6 +1,7 @@
 # Declarative List Rendering
 
-This document expands Scenario A from [../templates-vs-documents.md](../templates-vs-documents.md): how to render lists from arrays *without* introducing a dedicated Web Component.
+This document expands Scenario A from [../templates-vs-documents.md](../templates-vs-documents.md): how to render lists from arrays
+*without* introducing a dedicated Web Component.
 
 The goal is to keep templates "HTML-shaped" while still supporting:
 
@@ -24,11 +25,12 @@ The goal is to keep templates "HTML-shaped" while still supporting:
 ## Option A: Inline mapping (simple, explicit)
 
 ```ts
-import { html } from '@vanishing/framework/template';
+import { html } from "@vanishing/framework/template";
 
-export const view = (items: readonly { id: string; label: string }[]) => html`
+export const view = (items: readonly { id: string; label: string; }[]) =>
+  html`
   <ul>
-    ${() => items.map(item => html(item.id)`<li>${item.label}</li>`)}
+    ${() => items.map((item) => html(item.id)`<li>${item.label}</li>`)}
   </ul>
 `;
 ```
@@ -43,19 +45,23 @@ Cons: templates contain JS control-flow.
 
 Use a small helper so the template reads more like HTML.
 
-Note: `repeat()` is an optional convenience API. It is part of the project vision and the current prototype lives on the `repeat-directive` branch (not on `main`).
+Note: `repeat()` is an optional convenience API. It is part of the project vision and the current prototype lives on the
+`repeat-directive` branch (not on `main`).
 
 ```ts
 // Pseudocode (see branch: repeat-directive)
-import { html, repeat } from '@vanishing/framework/template';
+import { html, repeat } from "@vanishing/framework/template";
 
-export const view = (items: readonly { id: string; label: string }[]) => html`
+export const view = (items: readonly { id: string; label: string; }[]) =>
+  html`
   <ul>
-    ${repeat(
+    ${
+    repeat(
       () => items,
-      item => item.id,
-      item => html`<li>${item.label}</li>`,
-    )}
+      (item) => item.id,
+      (item) => html`<li>${item.label}</li>`,
+    )
+  }
   </ul>
 `;
 ```

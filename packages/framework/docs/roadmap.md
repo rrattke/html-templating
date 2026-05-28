@@ -1,12 +1,14 @@
 ## Roadmap: Refined Architecture & Pluggable Binding Strategy
 
-This document outlines the implementation steps to introduce value-based dirty checking, a pluggable binding interface, and a transition path to `lit-html`.
+This document outlines the implementation steps to introduce value-based dirty checking, a pluggable binding interface, and a
+transition path to `lit-html`.
 
 ---
 
 ### 1. Value-Based Dirty Checking
 
-To minimize DOM thrashing, we introduce a cache for previous values within the `TemplateInstance`. This ensures that "Dumb Parts" only execute when data actually changes.
+To minimize DOM thrashing, we introduce a cache for previous values within the `TemplateInstance`. This ensures that "Dumb Parts"
+only execute when data actually changes.
 
 ```typescript
 // Add to TemplateInstance in render.ts
@@ -26,14 +28,15 @@ export class TemplateInstance {
     });
   }
 }
-
 ```
 
 ---
 
 ### 2. Pluggable Binding Interface
 
-To generalize behavior, we decouple the `NodePart` from the specific logic of `StaticBinding` or `DynamicBinding`. By treating bindings as a "Strategy," you can swap rendering behaviors (e.g., portals, lists, or static content) without modifying the core `NodePart`.
+To generalize behavior, we decouple the `NodePart` from the specific logic of `StaticBinding` or `DynamicBinding`. By treating
+bindings as a "Strategy," you can swap rendering behaviors (e.g., portals, lists, or static content) without modifying the core
+`NodePart`.
 
 #### The Interface Definition
 
@@ -51,7 +54,6 @@ export interface BindingStrategy {
   /** Cleanup logic for effects and listeners */
   dispose(): void;
 }
-
 ```
 
 #### The Unified Binding Class
@@ -71,9 +73,9 @@ export class TemplateBinding implements BindingStrategy {
 
   mount(part: NodePart) {
     this.#instance = TemplateInstance.create(
-      this.#runtime!, 
-      this.#template, 
-      this.#values
+      this.#runtime!,
+      this.#template,
+      this.#values,
     );
     part.setValue(this.#instance.fragment);
   }
@@ -88,26 +90,27 @@ export class TemplateBinding implements BindingStrategy {
     this.#instance?.dispose();
   }
 }
-
 ```
 
 ---
 
 ### 3. Transitioning to lit-html
 
-If the complexity of custom list reconciliation (the "List Hell") outweighs the benefits of a bespoke engine, you can swap the Layer 3 logic for `lit-html`.
+If the complexity of custom list reconciliation (the "List Hell") outweighs the benefits of a bespoke engine, you can swap the Layer
+3 logic for `lit-html`.
 
 #### Core Characteristics
 
-* **Synchronous Updates:** Standalone `lit-html` updates the DOM synchronously during the `render()` call.
-* **Stability:** It uses the same canonical `strings` array check to ensure DOM structures are reused.
-* **Simplified Lists:** The `repeat` directive handles reordering and item identity via keys, removing the need for custom LIS algorithms.
+- **Synchronous Updates:** Standalone `lit-html` updates the DOM synchronously during the `render()` call.
+- **Stability:** It uses the same canonical `strings` array check to ensure DOM structures are reused.
+- **Simplified Lists:** The `repeat` directive handles reordering and item identity via keys, removing the need for custom LIS
+  algorithms.
 
 #### Integration Example
 
 ```typescript
-import { render, html } from 'lit-html';
-import { repeat } from 'lit-html/directives/repeat.js';
+import { html, render } from "lit-html";
+import { repeat } from "lit-html/directives/repeat.js";
 
 // Triggered by your existing SignalsRuntime
 effect(() => {
@@ -118,14 +121,14 @@ effect(() => {
         ${repeat(mySignal.value, (i) => i.id, (i) => html`<li>${i.label}</li>`)}
       </ul>
     `,
-    container
+    container,
   );
 });
-
 ```
 
 ---
 
 ### Next Step
 
-Would you like me to help you implement the **`createPrimitiveInstance`** helper mentioned in the `collectInstances` logic to ensure your new pluggable interface handles strings and numbers as elegantly as templates?
+Would you like me to help you implement the **`createPrimitiveInstance`** helper mentioned in the `collectInstances` logic to ensure
+your new pluggable interface handles strings and numbers as elegantly as templates?

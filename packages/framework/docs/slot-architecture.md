@@ -3,6 +3,7 @@
 ## Problem
 
 The current implementation mixes concerns:
+
 - **NodePart** (Layer 2) contains reconciliation logic that belongs in Layer 3
 - Asymmetric handling of single values vs arrays
 
@@ -87,19 +88,19 @@ for (const child of state.children) {
 }
 
 // Find by key
-const target = state.children.find(c => c.key === 'item-42');
+const target = state.children.find((c) => c.key === "item-42");
 
 // Access DOM
-target?.range.start.parentElement?.classList.add('highlight');
+target?.range.start.parentElement?.classList.add("highlight");
 ```
 
 ## Changes from Current
 
-| Component | Change |
-|-----------|--------|
-| NodePart | Unchanged (stays Layer 2, stateless) |
-| InstanceState | Add `children: InstanceState[]` |
-| Reconciler | Populate children when creating nested states |
+| Component     | Change                                        |
+| ------------- | --------------------------------------------- |
+| NodePart      | Unchanged (stays Layer 2, stateless)          |
+| InstanceState | Add `children: InstanceState[]`               |
+| Reconciler    | Populate children when creating nested states |
 
 ---
 
@@ -108,11 +109,13 @@ target?.range.start.parentElement?.classList.add('highlight');
 ### The Problem
 
 Currently logic is spread across:
+
 - `TemplateInstance.create()` - mixes instantiation with effect wiring
 - `NodePart.setValue()` - handles DynamicBinding instantiation and reconciliation
 - `Reconciler` - handles keyed lists but not general template hierarchy
 
 We need orchestration that:
+
 1. Resolves values (instantiate DynamicBindings recursively)
 2. Sets resolved values on parts
 3. Tracks the template hierarchy for reconciliation
@@ -128,18 +131,18 @@ function instantiateStatic(binding: StaticBinding): DocumentFragment {
   const template = binding.getTemplate();
   const fragment = template.cloneFragment();
   const parts = createParts(template.descriptors, fragment, binding.runtime);
-  
+
   parts.forEach((part, index) => {
     const value = binding.values[index];
     part.setValue(resolveStatic(value));
   });
-  
+
   return fragment;
 }
 
 function resolveStatic(value: unknown): unknown {
   if (isStaticBinding(value)) {
-    return instantiateStatic(value);  // Recurse
+    return instantiateStatic(value); // Recurse
   }
   if (Array.isArray(value)) {
     return value.map(resolveStatic);
@@ -170,16 +173,18 @@ class TemplateState {
   readonly instance: TemplateInstance;
   readonly range: NodeRange;
   readonly key: unknown | undefined;
-  
-  #children: Map<number, TemplateState[]> = new Map();  // partIndex → child states
+
+  #children: Map<number, TemplateState[]> = new Map(); // partIndex → child states
   #disposers: Array<() => void> = [];
-  
-  get fragment(): DocumentFragment { return this.instance.fragment; }
-  
+
+  get fragment(): DocumentFragment {
+    return this.instance.fragment;
+  }
+
   getChildren(partIndex: number): TemplateState[] {
     return this.#children.get(partIndex) ?? [];
   }
-  
+
   dispose(): void {
     // Dispose all children recursively
     for (const children of this.#children.values()) {
@@ -200,28 +205,28 @@ class TemplateState {
 ```typescript
 function createState(
   binding: DynamicBinding,
-  parent: TemplateState | null
+  parent: TemplateState | null,
 ): TemplateState {
   const template = binding.getTemplate();
   const fragment = template.cloneFragment();
   const parts = createParts(template.descriptors, fragment, binding.runtime);
   const instance = new TemplateInstance(fragment, parts, () => {});
-  
+
   // Create range markers
-  const startMarker = document.createComment('');
+  const startMarker = document.createComment("");
   fragment.insertBefore(startMarker, fragment.firstChild);
   const range = new NodeRange(startMarker);
   if (fragment.lastChild) {
     range.setEnd(fragment.lastChild);
   }
-  
+
   const state = new TemplateState(binding, instance, range, binding.key);
-  
+
   // Process each part/value pair
   parts.forEach((part, index) => {
     const value = binding.values[index];
-    
-    if (typeof value === 'function') {
+
+    if (typeof value === "function") {
       if (part instanceof EventAttributePart) {
         // Event handler - set directly
         part.setValue(value);
@@ -239,7 +244,7 @@ function createState(
       processValue(state, part, index, value);
     }
   });
-  
+
   return state;
 }
 ```
@@ -282,21 +287,21 @@ function reconcileSingle(
   state: TemplateState,
   part: NodePart,
   partIndex: number,
-  binding: DynamicBinding
+  binding: DynamicBinding,
 ): void {
   const existingChildren = state.getChildren(partIndex);
   const existing = existingChildren[0];
-  
+
   // Can reuse if same template structure
   if (existing && canReuse(existing, binding)) {
     // Update existing - values may have changed
     // (reactive values handle themselves via effects)
     return;
   }
-  
+
   // Dispose old, create new
   disposeChildren(state, partIndex);
-  
+
   const child = createState(binding, state);
   state.setChildren(partIndex, [child]);
   part.setValue(child.fragment);
@@ -315,33 +320,33 @@ function reconcileArray(
   state: TemplateState,
   part: NodePart,
   partIndex: number,
-  values: unknown[]
+  values: unknown[],
 ): void {
   const existingChildren = state.getChildren(partIndex);
   const existingByKey = new Map<unknown, TemplateState>();
-  
+
   // Index existing by key
   for (const child of existingChildren) {
     if (child.key !== undefined) {
       existingByKey.set(child.key, child);
     }
   }
-  
+
   const newChildren: TemplateState[] = [];
   const fragment = document.createDocumentFragment();
   const reusedKeys = new Set<unknown>();
-  
+
   for (const value of values) {
     if (!isDynamicBinding(value)) {
       // Non-template in array - convert to node
       fragment.appendChild(valueToNode(value));
       continue;
     }
-    
+
     const binding = value as DynamicBinding;
     const key = binding.key;
     const existing = key !== undefined ? existingByKey.get(key) : undefined;
-    
+
     if (existing && canReuse(existing, binding)) {
       // Reuse existing state
       reusedKeys.add(key);
@@ -355,7 +360,7 @@ function reconcileArray(
       fragment.appendChild(child.fragment);
     }
   }
-  
+
   // Dispose unused
   for (const child of existingChildren) {
     if (child.key === undefined || !reusedKeys.has(child.key)) {
@@ -363,7 +368,7 @@ function reconcileArray(
       child.range.deleteContents();
     }
   }
-  
+
   // Update DOM and state
   part.clear();
   part.setValue(fragment);
@@ -387,14 +392,14 @@ function appendRange(fragment: DocumentFragment, range: NodeRange): void {
   while (node) {
     const next = node.nextSibling;
     fragment.appendChild(node);
-    if (node === range.end) break;
+    if (node === range.end) { break; }
     node = next;
   }
 }
 
 function valueToNode(value: unknown): Node {
-  if (value instanceof Node) return value;
-  return document.createTextNode(String(value ?? ''));
+  if (value instanceof Node) { return value; }
+  return document.createTextNode(String(value ?? ""));
 }
 ```
 
@@ -455,11 +460,13 @@ Cannot refactor in place without breaking current implementation. Steps:
 
 ### Key Insight
 
-**Lists are the only source of variable-quantity slots.** A single slot always holds 0 or 1 value - reconcileSingle is just "same template? keep : replace". The interesting reconciliation (keyed matching, moves, insertions) only happens in arrays.
+**Lists are the only source of variable-quantity slots.** A single slot always holds 0 or 1 value - reconcileSingle is just "same
+template? keep : replace". The interesting reconciliation (keyed matching, moves, insertions) only happens in arrays.
 
 ### Further Simplification: Collapse TemplateInstance + InstanceState
 
-For the static case, we don't need to know anything about parts after creation. They're used to set values, then discarded. This means TemplateInstance is unnecessary overhead.
+For the static case, we don't need to know anything about parts after creation. They're used to set values, then discarded. This
+means TemplateInstance is unnecessary overhead.
 
 ### Current Structure (Over-Engineered)
 
@@ -506,6 +513,7 @@ TemplateState (L3) - THE ONLY stateful object
 Parts are used to set values during setup:
 
 **Static case**: Parts used once, then garbage collected
+
 ```typescript
 function instantiateStatic(binding: StaticBinding): DocumentFragment {
   const fragment = binding.getTemplate().cloneFragment();
@@ -520,10 +528,11 @@ function instantiateStatic(binding: StaticBinding): DocumentFragment {
 ```
 
 **Dynamic case**: Parts captured in effect closures, not stored in array
+
 ```typescript
 // Effect captures part in closure - no array storage needed
 const dispose = runtime.effect(() => {
-  part.setValue(getValue());  // part lives in closure
+  part.setValue(getValue()); // part lives in closure
 });
 state.addDisposer(dispose);
 
@@ -548,25 +557,25 @@ type Part = NodePart | AttributePart | PropertyPart | EventAttributePart | Boole
 class TemplateState {
   readonly range: NodeRange;
   readonly key: unknown | undefined;
-  
+
   #children: Map<number, TemplateState[]>;
   #disposers: (() => void)[];
-  
+
   dispose(): void {
     for (const children of this.#children.values()) {
-      for (const child of children) child.dispose();
+      for (const child of children) { child.dispose(); }
     }
-    for (const dispose of this.#disposers) dispose();
+    for (const dispose of this.#disposers) { dispose(); }
   }
 }
 ```
 
 ### Summary
 
-| Concept | Role | Lifetime |
-|---------|------|----------|
-| Template | Static structure | Application lifetime |
-| Part | Apply value to DOM location | Transient (setup only) or closure-captured |
-| TemplateState | Track DOM range, children, cleanup | Render lifetime |
-| TemplateInstance | ~~Owns parts~~ | **Eliminated** |
-| InstanceState | ~~Wraps instance~~ | **Merged into TemplateState** |
+| Concept          | Role                               | Lifetime                                   |
+| ---------------- | ---------------------------------- | ------------------------------------------ |
+| Template         | Static structure                   | Application lifetime                       |
+| Part             | Apply value to DOM location        | Transient (setup only) or closure-captured |
+| TemplateState    | Track DOM range, children, cleanup | Render lifetime                            |
+| TemplateInstance | ~~Owns parts~~                     | **Eliminated**                             |
+| InstanceState    | ~~Wraps instance~~                 | **Merged into TemplateState**              |

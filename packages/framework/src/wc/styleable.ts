@@ -1,7 +1,7 @@
 /**
  * A constructor type for classes that can be mixed with Styleable.
  */
-type Constructor<T = object> = abstract new (...args: any[]) => T;
+type Constructor<T = object> = abstract new(...args: any[]) => T;
 
 /**
  * Interface for classes with lifecycle callbacks.
@@ -22,7 +22,7 @@ export interface StyleableStatic {
    * Can be a CSSStyleSheet or raw CSS string.
    */
   styles?: CSSStyleSheet | string;
-  
+
   /**
    * Custom styles injected by the user for white-labeling.
    * These are added to @layer custom which has higher priority than base.
@@ -51,7 +51,7 @@ function toStyleSheet(css: CSSStyleSheet | string): CSSStyleSheet {
   if (css instanceof CSSStyleSheet) {
     return css;
   }
-  
+
   // Check string cache
   let sheet = stringSheetCache.get(css);
   if (!sheet) {
@@ -66,7 +66,7 @@ function toStyleSheet(css: CSSStyleSheet | string): CSSStyleSheet {
  * Wraps CSS in a layer if not already layered.
  */
 function wrapInLayer(css: string, layer: string): string {
-  if (css.includes('@layer')) {
+  if (css.includes("@layer")) {
     return css;
   }
   return `@layer ${layer} { ${css} }`;
@@ -77,7 +77,7 @@ function wrapInLayer(css: string, layer: string): string {
  */
 function createLayerOrderSheet(): CSSStyleSheet {
   const sheet = new CSSStyleSheet();
-  sheet.replaceSync('@layer base, custom;');
+  sheet.replaceSync("@layer base, custom;");
   return sheet;
 }
 
@@ -85,19 +85,19 @@ const layerOrderSheet = createLayerOrderSheet();
 
 /**
  * Mixin that adds adoptable stylesheet support with layer-based theming.
- * 
+ *
  * @example
  * ```typescript
  * import styles from './my-component.css?inline';
- * 
+ *
  * class MyComponent extends Styleable(ReactiveElement) {
  *   static styles = styles;
- *   
+ *
  *   template() {
  *     return html`<div>content</div>`;
  *   }
  * }
- * 
+ *
  * // User customization:
  * MyComponent.customStyles = `
  *   button { background: red; }
@@ -105,7 +105,7 @@ const layerOrderSheet = createLayerOrderSheet();
  * ```
  */
 export function Styleable<TBase extends Constructor<HTMLElement & HasConnectedCallback>>(
-  Base: TBase
+  Base: TBase,
 ): TBase & Constructor<StyleableInstance> {
   abstract class StyleableElement extends Base implements StyleableInstance {
     /**
@@ -120,27 +120,27 @@ export function Styleable<TBase extends Constructor<HTMLElement & HasConnectedCa
 
     #adoptStyles(): void {
       const ctor = this.constructor as unknown as StyleableStatic;
-      const root = this.shadowRoot ?? this.attachShadow({ mode: 'open' });
-      
+      const root = this.shadowRoot ?? this.attachShadow({ mode: "open" });
+
       const sheets: CSSStyleSheet[] = [layerOrderSheet];
-      
+
       // Add base styles from static property
       if (ctor.styles) {
-        const baseCSS = typeof ctor.styles === 'string' 
-          ? wrapInLayer(ctor.styles, 'base')
+        const baseCSS = typeof ctor.styles === "string"
+          ? wrapInLayer(ctor.styles, "base")
           : ctor.styles;
         sheets.push(toStyleSheet(baseCSS));
       }
-      
+
       // Add custom styles (instance takes precedence over static)
       const customCSS = this.customStyles ?? ctor.customStyles;
       if (customCSS) {
-        const wrappedCustom = typeof customCSS === 'string'
-          ? wrapInLayer(customCSS, 'custom')
+        const wrappedCustom = typeof customCSS === "string"
+          ? wrapInLayer(customCSS, "custom")
           : customCSS;
         sheets.push(toStyleSheet(wrappedCustom));
       }
-      
+
       root.adoptedStyleSheets = sheets;
     }
   }

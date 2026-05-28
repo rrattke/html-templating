@@ -1,8 +1,15 @@
-import { NodeRange } from './dom.js';
-import type { Descriptor } from './template.js';
-import { resolvePath } from './template.js';
+import { NodeRange } from "./dom.js";
+import type { Descriptor } from "./template.js";
+import { resolvePath } from "./template.js";
 
-export type Part = NodePart | StandardAttributePart | PropertyAttributePart | BooleanAttributePart | EventAttributePart | TemplateAttributePart | TextContentPart;
+export type Part =
+  | NodePart
+  | StandardAttributePart
+  | PropertyAttributePart
+  | BooleanAttributePart
+  | EventAttributePart
+  | TemplateAttributePart
+  | TextContentPart;
 
 /**
  * Strategy interface for setting attribute or property values on elements.
@@ -22,7 +29,7 @@ class AttributeBinding implements BindingStrategy {
       return;
     }
     if (value === true) {
-      element.setAttribute(name, '');
+      element.setAttribute(name, "");
       return;
     }
     element.setAttribute(name, String(value));
@@ -46,7 +53,7 @@ class PropertyBinding implements BindingStrategy {
 class BooleanAttributeBinding implements BindingStrategy {
   set(element: Element, name: string, value: unknown): void {
     if (value) {
-      element.setAttribute(name, '');
+      element.setAttribute(name, "");
     } else {
       element.removeAttribute(name);
     }
@@ -64,7 +71,7 @@ export class TextTemplate {
 
   constructor(strings: string[]) {
     this.#strings = strings;
-    this.#values = new Array(strings.length - 1).fill('');
+    this.#values = new Array(strings.length - 1).fill("");
   }
 
   setSlot(index: number, value: unknown): void {
@@ -74,7 +81,7 @@ export class TextTemplate {
   render(): string {
     let result = this.#strings[0];
     for (let i = 0; i < this.#values.length; i++) {
-      result += String(this.#values[i] ?? '');
+      result += String(this.#values[i] ?? "");
       result += this.#strings[i + 1];
     }
     return result;
@@ -129,10 +136,10 @@ export class NodePart {
 }
 
 function isIterable(value: unknown): value is Iterable<unknown> {
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     return false;
   }
-  return value != null && typeof (value as Iterable<unknown>)[Symbol.iterator] === 'function';
+  return value != null && typeof (value as Iterable<unknown>)[Symbol.iterator] === "function";
 }
 
 /**
@@ -219,7 +226,7 @@ export class EventAttributePart {
       this.#element.removeEventListener(this.#eventName, this.#listener);
       this.#listener = null;
     }
-    if (typeof value === 'function') {
+    if (typeof value === "function") {
       this.#listener = value as EventListener;
       this.#element.addEventListener(this.#eventName, this.#listener);
     }
@@ -276,7 +283,7 @@ export class TextContentPart {
       this.#element.textContent = this.#textTemplate.render();
       return;
     }
-    this.#element.textContent = String(value ?? '');
+    this.#element.textContent = String(value ?? "");
   }
 }
 
@@ -290,33 +297,33 @@ export class TextContentPart {
  */
 export function createParts(descriptors: Descriptor[], fragment: DocumentFragment): Part[] {
   const textTemplateCache = new Map<Descriptor, TextTemplate>();
-  
+
   return descriptors.map((descriptor, index) => {
     if (!descriptor) {
-      throw new Error('Missing template descriptor.');
+      throw new Error("Missing template descriptor.");
     }
-    if (descriptor.type === 'node') {
+    if (descriptor.type === "node") {
       const marker = resolvePath(fragment, descriptor.path);
       if (!(marker instanceof Comment)) {
-        throw new Error('Node descriptor did not resolve to a comment marker.');
+        throw new Error("Node descriptor did not resolve to a comment marker.");
       }
       return new NodePart(marker);
     }
-    if (descriptor.type === 'attribute') {
+    if (descriptor.type === "attribute") {
       const element = resolvePath(fragment, descriptor.path);
       if (!(element instanceof Element)) {
-        throw new Error('Attribute descriptor did not resolve to an element.');
+        throw new Error("Attribute descriptor did not resolve to an element.");
       }
       // Determine which specialized part to create based on attribute name prefix
-      if (descriptor.name.startsWith('@')) {
+      if (descriptor.name.startsWith("@")) {
         // @event → Event handler
         const eventName = descriptor.name.slice(1);
         return new EventAttributePart(element, eventName);
-      } else if (descriptor.name.startsWith('.')) {
+      } else if (descriptor.name.startsWith(".")) {
         // .property → Property binding
         const propertyName = descriptor.name.slice(1);
         return new PropertyAttributePart(element, propertyName);
-      } else if (descriptor.name.startsWith('?')) {
+      } else if (descriptor.name.startsWith("?")) {
         // ?attribute → Boolean attribute (adds/removes based on truthiness)
         const attributeName = descriptor.name.slice(1);
         return new BooleanAttributePart(element, attributeName);
@@ -325,50 +332,50 @@ export function createParts(descriptors: Descriptor[], fragment: DocumentFragmen
         return new StandardAttributePart(element, descriptor.name);
       }
     }
-    if (descriptor.type === 'textContent') {
+    if (descriptor.type === "textContent") {
       const element = resolvePath(fragment, descriptor.path);
       if (!(element instanceof Element)) {
-        throw new Error('TextContent descriptor did not resolve to an element.');
+        throw new Error("TextContent descriptor did not resolve to an element.");
       }
       return new TextContentPart(element);
     }
-    if (descriptor.type === 'textTemplate') {
+    if (descriptor.type === "textTemplate") {
       // Get or create shared TextTemplate for this descriptor
       let textTemplate = textTemplateCache.get(descriptor);
       if (!textTemplate) {
         textTemplate = new TextTemplate(descriptor.strings);
         textTemplateCache.set(descriptor, textTemplate);
       }
-      
+
       // Find which slot this value index corresponds to
       const slotIndex = descriptor.indices.indexOf(index);
       if (slotIndex === -1) {
-        throw new Error('Value index not found in textTemplate descriptor indices.');
+        throw new Error("Value index not found in textTemplate descriptor indices.");
       }
-      
+
       const element = resolvePath(fragment, descriptor.path);
       if (!(element instanceof Element)) {
-        throw new Error('TextTemplate descriptor did not resolve to an element.');
+        throw new Error("TextTemplate descriptor did not resolve to an element.");
       }
-      
-      if (descriptor.target === 'attribute') {
+
+      if (descriptor.target === "attribute") {
         if (!descriptor.name) {
-          throw new Error('TextTemplate attribute descriptor missing name.');
+          throw new Error("TextTemplate attribute descriptor missing name.");
         }
         // Determine which binding strategy to use based on attribute name prefix
         let strategy = ATTRIBUTE_BINDING;
         let name = descriptor.name;
-        
-        if (descriptor.name.startsWith('.')) {
+
+        if (descriptor.name.startsWith(".")) {
           // .property → Property binding
           strategy = PROPERTY_BINDING;
           name = descriptor.name.slice(1);
-        } else if (descriptor.name.startsWith('?')) {
+        } else if (descriptor.name.startsWith("?")) {
           // ?attribute → Boolean attribute binding
           strategy = BOOLEAN_ATTRIBUTE_BINDING;
           name = descriptor.name.slice(1);
         }
-        
+
         return new TemplateAttributePart(element, name, textTemplate, slotIndex, strategy);
       } else {
         return new TextContentPart(element, textTemplate, slotIndex);

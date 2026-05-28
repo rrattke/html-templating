@@ -3,7 +3,8 @@
 This repo uses two distinct (but compatible) approaches depending on what you are building:
 
 - **Scenario A — Templated Lists (state → DOM)**: you have an array/object model and render it into the DOM.
-- **Scenario B — Visual HTML Editor (DOM as document)**: you author a document as DOM/HTML, persist it, and later parse it back into an editor model.
+- **Scenario B — Visual HTML Editor (DOM as document)**: you author a document as DOM/HTML, persist it, and later parse it back into
+  an editor model.
 
 The unifying idea: HTML/DOM is the descriptive output, while rendering + wiring happen at lifecycle boundaries.
 

@@ -1,6 +1,7 @@
 # Native Signals Example (Vite + TypeScript)
 
-This workspace package demonstrates how to consume the `@vanishing/framework` library from a modern Vite toolchain. Everything is written in TypeScript and compiled/bundled by Vite.
+This workspace package demonstrates how to consume the `@vanishing/framework` library from a modern Vite toolchain. Everything is
+written in TypeScript and compiled/bundled by Vite.
 
 ## Scripts
 

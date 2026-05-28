@@ -30,7 +30,7 @@ export function resolvePath(root: Node, path: number[]): Node {
   for (const index of path) {
     const next = node.childNodes[index];
     if (!next) {
-      throw new Error('Failed to resolve part path.');
+      throw new Error("Failed to resolve part path.");
     }
     node = next;
   }
@@ -40,7 +40,7 @@ export function resolvePath(root: Node, path: number[]): Node {
 /**
  * Tracks a contiguous sequence of DOM nodes.
  * Uses an exclusive start marker (Comment or first content node) and inclusive end node.
- * 
+ *
  * Range states:
  * - Empty/collapsed: end === start (no content between markers)
  * - Non-empty: end is the last content node after start
@@ -140,14 +140,14 @@ export class NodeRange {
    */
   static extractNodes(start: Node, end: Node | null): DocumentFragment {
     const fragment = (start.ownerDocument || document).createDocumentFragment();
-    
+
     let node = start.nextSibling;
     while (node && node !== end) {
       const next = node.nextSibling;
       fragment.appendChild(node);
       node = next;
     }
-    
+
     return fragment;
   }
 
@@ -157,15 +157,15 @@ export class NodeRange {
    */
   static extractInclusive(start: Node, end: Node): DocumentFragment {
     const fragment = NodeRange.ownerDocument(start, end).createDocumentFragment();
-    
+
     let node: Node | null = start;
     while (node) {
       const next: Node | null = node.nextSibling;
       fragment.appendChild(node);
-      if (node === end) break;
+      if (node === end) { break; }
       node = next;
     }
-    
+
     return fragment;
   }
 
@@ -176,13 +176,13 @@ export class NodeRange {
    */
   static cloneNodes(start: Node, end: Node | null): DocumentFragment {
     const fragment = (start.ownerDocument || document).createDocumentFragment();
-    
+
     let node = start.nextSibling;
     while (node && node !== end) {
       fragment.appendChild(node.cloneNode(true));
       node = node.nextSibling;
     }
-    
+
     return fragment;
   }
 
@@ -207,7 +207,7 @@ export class NodeRange {
   static insertNode(start: Node, content: Node): Node {
     const parent = start.parentNode;
     if (!parent) {
-      throw new Error('NodeRange marker is not attached to DOM');
+      throw new Error("NodeRange marker is not attached to DOM");
     }
 
     if (content instanceof DocumentFragment) {
@@ -239,15 +239,15 @@ export class NodeRange {
   static ownerDocument(start: Node, end: Node): Document {
     const startDoc = start.ownerDocument;
     const endDoc = end.ownerDocument;
-    
+
     if (!startDoc) {
-      throw new Error('Start node has no owner document');
+      throw new Error("Start node has no owner document");
     }
-    
+
     if (start !== end && startDoc !== endDoc) {
-      throw new Error('Range boundaries must belong to the same document');
+      throw new Error("Range boundaries must belong to the same document");
     }
-    
+
     return startDoc;
   }
 }

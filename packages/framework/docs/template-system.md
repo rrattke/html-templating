@@ -1,6 +1,7 @@
 # Template System
 
-This document explains how the framework's template system works, from tagged template literals to live DOM updates. It covers parsing, instantiation, part types, and reactive integration.
+This document explains how the framework's template system works, from tagged template literals to live DOM updates. It covers
+parsing, instantiation, part types, and reactive integration.
 
 ---
 
@@ -22,7 +23,8 @@ This document explains how the framework's template system works, from tagged te
                DOM updates via SignalsRuntime
 ```
 
-Each stage runs once per component instantiation, while reactive updates flow directly to individual parts without re-parsing templates.
+Each stage runs once per component instantiation, while reactive updates flow directly to individual parts without re-parsing
+templates.
 
 ---
 
@@ -64,7 +66,8 @@ const card = html`
 
 When the framework sees a new `strings` array it:
 
-1. Concatenates the strings while inserting comment markers for node expressions and synthetic attribute markers for attribute expressions
+1. Concatenates the strings while inserting comment markers for node expressions and synthetic attribute markers for attribute
+   expressions
 2. Parses the result once via `<template>.innerHTML`
 3. Walks the DOM using `TreeWalker` to find comment and attribute placeholders and stores their DOM paths in descriptors
 4. Stores the resulting `Template` in a `WeakMap`, so future uses skip parsing entirely
@@ -119,19 +122,19 @@ The `HTMLContextTracker` maintains a state machine that tracks:
 
 ```typescript
 // Node part
-html`<div>${content}</div>`
+html`<div>${content}</div>`;
 // → "<div><!--part:0--></div>"
 
 // Attribute part
-html`<div class=${className}></div>`
+html`<div class=${className}></div>`;
 // → '<div class="%%PART:0%%"></div>'
 
 // Multiple parts
-html`<div class=${cls}>${content}</div>`
+html`<div class=${cls}>${content}</div>`;
 // → '<div class="%%PART:0%%"><!--part:1--></div>'
 
 // Multiple values in one attribute
-html`<div class="btn ${size} ${variant}"></div>`
+html`<div class="btn ${size} ${variant}"></div>`;
 // → '<div class="btn %%PART:0%% %%PART:1%%"></div>'
 ```
 
@@ -144,7 +147,7 @@ html`<div class="btn ${size} ${variant}"></div>`
 The processed HTML string is assigned to a `<template>` element's `innerHTML`:
 
 ```typescript
-const template = document.createElement('template');
+const template = document.createElement("template");
 template.innerHTML = buildHTML(strings);
 ```
 
@@ -206,7 +209,8 @@ For each marker found, a descriptor is created:
 
 ### Path Building
 
-Each descriptor includes a `path` array that represents the route from the DocumentFragment root to the target node. For example, the path `[0, 2, 1]` means:
+Each descriptor includes a `path` array that represents the route from the DocumentFragment root to the target node. For example,
+the path `[0, 2, 1]` means:
 
 - Start at the fragment root
 - Go to child at index 0
@@ -221,7 +225,8 @@ Template records are cached using a WeakMap keyed by the `TemplateStringsArray`:
 const templateCache = new WeakMap<TemplateStringsArray, Template>();
 ```
 
-Since template string arrays are interned by JavaScript engines, the same template literal will always return the same array instance, making caching efficient.
+Since template string arrays are interned by JavaScript engines, the same template literal will always return the same array
+instance, making caching efficient.
 
 ---
 
@@ -243,7 +248,7 @@ Since template string arrays are interned by JavaScript engines, the same templa
 ### Cloning the Template
 
 ```typescript
-const fragment = template.cloneFragment();  // template.content.cloneNode(true)
+const fragment = template.cloneFragment(); // template.content.cloneNode(true)
 ```
 
 This creates a fresh copy of the DOM structure for each use.
@@ -311,15 +316,15 @@ For multiple values in a single location, a shared `TextTemplate` instance is cr
 class TextTemplate {
   #strings: string[];
   #values: unknown[];
-  
+
   setSlot(index: number, value: unknown): void {
     this.#values[index] = value;
   }
-  
+
   render(): string {
     let result = this.#strings[0];
     for (let i = 0; i < this.#values.length; i++) {
-      result += String(this.#values[i] ?? '');
+      result += String(this.#values[i] ?? "");
       result += this.#strings[i + 1];
     }
     return result;
@@ -376,12 +381,15 @@ Because `NodePart` understands `DynamicBinding` values and generic iterables, yo
 ```ts
 html`
   <ul>
-    ${() => items().map((item, index) => html`
+    ${() =>
+  items().map((item, index) =>
+    html`
       <li>
         <span>${item.label}</span>
         <button @click=${() => remove(index)}>Remove</button>
       </li>
-    `)}
+    `
+  )}
   </ul>
 `;
 ```
@@ -397,9 +405,12 @@ For DOM node reuse during reordering, use keyed templates:
 ```ts
 html`
   <ul>
-    ${() => items().map(item => html(item.id)`
+    ${() =>
+  items().map((item) =>
+    html(item.id)`
       <li>${item.label}</li>
-    `)}
+    `
+  )}
   </ul>
 `;
 ```
@@ -414,8 +425,8 @@ html`
 ### Input Template
 
 ```typescript
-const userName = signal('Alice');
-const userClass = 'user-active';
+const userName = signal("Alice");
+const userClass = "user-active";
 const template = html`<div class="card ${userClass}">
   <span>Hello ${userName}!</span>
 </div>`;
@@ -425,11 +436,11 @@ const template = html`<div class="card ${userClass}">
 
 ```typescript
 // Input
-strings: ['<div class="card ', '">\n  <span>Hello ', '!</span>\n</div>']
-values: ['user-active', userName]
+strings: ["<div class=\"card ", "\">\n  <span>Hello ", "!</span>\n</div>"];
+values: ["user-active", userName];
 
 // Output HTML
-'<div class="card %%PART:0%%">\n  <span>Hello <!--part:1-->!</span>\n</div>'
+"<div class=\"card %%PART:0%%\">\n  <span>Hello <!--part:1-->!</span>\n</div>";
 ```
 
 ### Step 2: Parse and Extract Descriptors
@@ -437,18 +448,18 @@ values: ['user-active', userName]
 ```typescript
 descriptors: [
   {
-    type: 'textTemplate',
-    target: 'attribute',
-    name: 'class',
+    type: "textTemplate",
+    target: "attribute",
+    name: "class",
     path: [0],
-    strings: ['card ', ''],
-    indices: [0]
+    strings: ["card ", ""],
+    indices: [0],
   },
   {
-    type: 'node',
-    path: [0, 2, 1]
-  }
-]
+    type: "node",
+    path: [0, 2, 1],
+  },
+];
 ```
 
 ### Step 3: Instantiate
@@ -458,23 +469,23 @@ descriptors: [
 const fragment = template.cloneFragment();
 
 // Create parts
-parts[0] = new TemplateAttributePart(divElement, 'class', textTemplate, 0);
+parts[0] = new TemplateAttributePart(divElement, "class", textTemplate, 0);
 parts[1] = new NodePart(markerComment);
 
 // Set values with reactive effects
-parts[0].setValue('user-active');  // Static
-runtime.effect(() => parts[1].setValue(userName()));  // Reactive
+parts[0].setValue("user-active"); // Static
+runtime.effect(() => parts[1].setValue(userName())); // Reactive
 
 // Final DOM
 <div class="card user-active">
   <span>Hello Alice!</span>
-</div>
+</div>;
 ```
 
 ### Step 4: Reactive Update
 
 ```typescript
-userName.set('Bob');
+userName.set("Bob");
 // → Effect re-runs → NodePart.setValue('Bob')
 // → DOM updates: "Alice" → "Bob"
 ```
@@ -485,12 +496,12 @@ userName.set('Bob');
 
 The template system is organized into layers:
 
-| Module        | Layer | Responsibility                                                     |
-| ------------- | ----- | ------------------------------------------------------------------ |
-| `dom.ts`      | 0     | `NodeRange`, `buildPath()`, `resolvePath()`                        |
-| `template.ts` | 1     | HTML parsing, `Template` class, compile + cache + clone            |
-| `parts.ts`    | 2     | Part implementations + `createParts()` factory                     |
-| `render.ts`   | 3     | `StaticBinding`, `DynamicBinding`, `TemplateInstance`, `Reconciler`|
+| Module        | Layer | Responsibility                                                      |
+| ------------- | ----- | ------------------------------------------------------------------- |
+| `dom.ts`      | 0     | `NodeRange`, `buildPath()`, `resolvePath()`                         |
+| `template.ts` | 1     | HTML parsing, `Template` class, compile + cache + clone             |
+| `parts.ts`    | 2     | Part implementations + `createParts()` factory                      |
+| `render.ts`   | 3     | `StaticBinding`, `DynamicBinding`, `TemplateInstance`, `Reconciler` |
 
 ---
 

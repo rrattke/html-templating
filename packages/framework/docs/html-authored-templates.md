@@ -2,7 +2,8 @@
 
 This document explores a more "HTML-authored" alternative for Scenario 1 (lists from arrays), inspired by frameworks like Aurelia.
 
-It is intentionally a design sketch: a mental model, authoring syntax options, and an incremental implementation path that fits this framework’s existing template/parts/reconciliation model.
+It is intentionally a design sketch: a mental model, authoring syntax options, and an incremental implementation path that fits this
+framework’s existing template/parts/reconciliation model.
 
 ---
 
@@ -113,16 +114,19 @@ This is less expressive but much easier to implement without a full expression l
 
 Conceptually, it compiles that template into something equivalent to:
 
-Note: `repeat()` here refers to a keyed-list primitive. A prototype exists on the `repeat-directive` branch, but the HTML-authored direction does not depend on that exact API.
+Note: `repeat()` here refers to a keyed-list primitive. A prototype exists on the `repeat-directive` branch, but the HTML-authored
+direction does not depend on that exact API.
 
 ```ts
 html`<x-plot>
-  ${repeat(
+  ${
+  repeat(
     () => signals,
-    s => s.id,
-    s => html`<x-signal src=${s.src} color=${s.color}></x-signal>`,
-  )}
-</x-plot>`
+    (s) => s.id,
+    (s) => html`<x-signal src=${s.src} color=${s.color}></x-signal>`,
+  )
+}
+</x-plot>`;
 ```
 
 So you still reuse the existing reconciliation engine; you’re just moving control-flow out of the user’s JS.

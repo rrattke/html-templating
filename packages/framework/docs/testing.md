@@ -19,11 +19,11 @@ Files with the `.spec.ts` extension contain **actual test suites** using Vitest.
 
 ```typescript
 // parts.spec.ts
-import { describe, it, expect } from 'vitest';
-import { StandardAttributePart } from './parts.js';
+import { describe, expect, it } from "vitest";
+import { StandardAttributePart } from "./parts.js";
 
-describe('StandardAttributePart', () => {
-  it('should set attribute value', () => {
+describe("StandardAttributePart", () => {
+  it("should set attribute value", () => {
     // test implementation
   });
 });
@@ -42,7 +42,7 @@ Files with the `.test.ts` extension contain **test utilities and helpers**. Thes
 
 ```typescript
 // parts.test.ts
-export function createTestElement(tag: string = 'div'): Element {
+export function createTestElement(tag: string = "div"): Element {
   return document.createElement(tag);
 }
 
@@ -78,7 +78,8 @@ src/
 
 ## Build Configuration
 
-The build configuration (vite.config.ts) is set up to exclude both `.spec.ts` and `.test.ts` files from the production bundle. This ensures:
+The build configuration (vite.config.ts) is set up to exclude both `.spec.ts` and `.test.ts` files from the production bundle. This
+ensures:
 
 - Test code never ships to production
 - Bundle size remains minimal
@@ -94,14 +95,14 @@ Instead of repeating setup code in every test, extract common patterns into `.te
 
 ```typescript
 // parts.spec.ts
-describe('StandardAttributePart', () => {
-  it('test 1', () => {
-    const element = document.createElement('div');
+describe("StandardAttributePart", () => {
+  it("test 1", () => {
+    const element = document.createElement("div");
     // test...
   });
-  
-  it('test 2', () => {
-    const element = document.createElement('div');
+
+  it("test 2", () => {
+    const element = document.createElement("div");
     // test...
   });
 });
@@ -112,19 +113,19 @@ describe('StandardAttributePart', () => {
 ```typescript
 // parts.test.ts
 export function createTestElement() {
-  return document.createElement('div');
+  return document.createElement("div");
 }
 
 // parts.spec.ts
-import { createTestElement } from './parts.test.js';
+import { createTestElement } from "./parts.test.js";
 
-describe('StandardAttributePart', () => {
-  it('test 1', () => {
+describe("StandardAttributePart", () => {
+  it("test 1", () => {
     const element = createTestElement();
     // test...
   });
-  
-  it('test 2', () => {
+
+  it("test 2", () => {
     const element = createTestElement();
     // test...
   });
@@ -136,11 +137,11 @@ describe('StandardAttributePart', () => {
 Group related tests using `describe()` blocks:
 
 ```typescript
-describe('StandardAttributePart', () => {
-  describe('setValue', () => {
-    it('should set string values', () => { /* ... */ });
-    it('should handle null values', () => { /* ... */ });
-    it('should handle boolean values', () => { /* ... */ });
+describe("StandardAttributePart", () => {
+  describe("setValue", () => {
+    it("should set string values", () => {/* ... */});
+    it("should handle null values", () => {/* ... */});
+    it("should handle boolean values", () => {/* ... */});
   });
 });
 ```
@@ -152,15 +153,15 @@ Test names should clearly describe what they test:
 **❌ Don't:**
 
 ```typescript
-it('works', () => { /* ... */ });
-it('test 1', () => { /* ... */ });
+it("works", () => {/* ... */});
+it("test 1", () => {/* ... */});
 ```
 
 **✅ Do:**
 
 ```typescript
-it('should remove attribute when value is null', () => { /* ... */ });
-it('should set empty string when value is true', () => { /* ... */ });
+it("should remove attribute when value is null", () => {/* ... */});
+it("should set empty string when value is true", () => {/* ... */});
 ```
 
 ### 4. Keep Tests Focused
@@ -170,32 +171,32 @@ Each test should verify one specific behavior:
 **❌ Don't:**
 
 ```typescript
-it('should handle all attribute operations', () => {
-  part.setValue('value1');
-  expect(element.getAttribute('name')).toBe('value1');
+it("should handle all attribute operations", () => {
+  part.setValue("value1");
+  expect(element.getAttribute("name")).toBe("value1");
   part.setValue(null);
-  expect(element.hasAttribute('name')).toBe(false);
+  expect(element.hasAttribute("name")).toBe(false);
   part.setValue(true);
-  expect(element.getAttribute('name')).toBe('');
+  expect(element.getAttribute("name")).toBe("");
 });
 ```
 
 **✅ Do:**
 
 ```typescript
-it('should set attribute to string value', () => {
-  part.setValue('value1');
-  expect(element.getAttribute('name')).toBe('value1');
+it("should set attribute to string value", () => {
+  part.setValue("value1");
+  expect(element.getAttribute("name")).toBe("value1");
 });
 
-it('should remove attribute when value is null', () => {
+it("should remove attribute when value is null", () => {
   part.setValue(null);
-  expect(element.hasAttribute('name')).toBe(false);
+  expect(element.hasAttribute("name")).toBe(false);
 });
 
-it('should set empty string when value is true', () => {
+it("should set empty string when value is true", () => {
   part.setValue(true);
-  expect(element.getAttribute('name')).toBe('');
+  expect(element.getAttribute("name")).toBe("");
 });
 ```
 
@@ -204,16 +205,16 @@ it('should set empty string when value is true', () => {
 Use `beforeEach()` and `afterEach()` for setup and cleanup:
 
 ```typescript
-describe('EventAttributePart', () => {
+describe("EventAttributePart", () => {
   let element: Element;
   let part: EventAttributePart;
-  
+
   beforeEach(() => {
     element = createTestElement();
-    part = new EventAttributePart(element, 'onclick');
+    part = new EventAttributePart(element, "onclick");
   });
-  
-  it('should add event listener', () => {
+
+  it("should add event listener", () => {
     // test...
   });
 });

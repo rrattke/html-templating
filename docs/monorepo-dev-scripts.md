@@ -1,6 +1,7 @@
 # Monorepo Dev & Start Scripts
 
-This document describes the solution for coordinating development and production scripts across npm workspaces with dependencies between packages.
+This document describes the solution for coordinating development and production scripts across npm workspaces with dependencies
+between packages.
 
 ## Problem
 
@@ -34,14 +35,14 @@ Use a combination of:
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "build:packages": "npm run build --workspace=<framework> && npm run build --workspace=<components>",
-    
+
     "dev:fw": "npm run dev --workspace=<framework>",
     "dev:components": "wait-on packages/<framework>/lib/index.d.ts && npm run dev --workspace=<components>",
     "dev:packages": "concurrently -n fw,comp -c blue,green \"npm run dev:fw\" \"npm run dev:components\"",
-    
+
     "dev:app": "wait-on packages/<components>/lib/index.d.ts && npm run dev --workspace=<app>",
     "dev": "concurrently -n fw,comp,app -c blue,green,yellow \"npm run dev:fw\" \"npm run dev:components\" \"npm run dev:app\"",
-    
+
     "start": "npm run build:packages && npm run start --workspace=<app>",
     "start:app": "npm run build:packages && npm run start --workspace=<app>"
   },
@@ -92,43 +93,43 @@ Libraries must output to a `lib/` directory with TypeScript declarations:
 
 ```typescript
 // packages/<library>/vite.config.ts
-import { defineConfig } from 'vite';
-import dts from 'vite-plugin-dts';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { defineConfig } from "vite";
+import dts from "vite-plugin-dts";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const dirname = fileURLToPath(new URL('.', import.meta.url));
+const dirname = fileURLToPath(new URL(".", import.meta.url));
 
 export default defineConfig({
   build: {
     lib: {
       entry: {
-        index: path.resolve(dirname, 'src/index.ts'),
+        index: path.resolve(dirname, "src/index.ts"),
         // Add additional entry points as needed
-        utils: path.resolve(dirname, 'src/utils.ts'),
+        utils: path.resolve(dirname, "src/utils.ts"),
       },
-      formats: ['es']
+      formats: ["es"],
     },
-    outDir: 'lib',
+    outDir: "lib",
     emptyOutDir: true,
     sourcemap: true,
     rollupOptions: {
       output: {
         preserveModules: true,
-        preserveModulesRoot: 'src',
-        entryFileNames: '[name].js'
-      }
-    }
+        preserveModulesRoot: "src",
+        entryFileNames: "[name].js",
+      },
+    },
   },
   plugins: [
     dts({
-      tsconfigPath: path.resolve(dirname, 'tsconfig.json'),
-      outDir: 'lib',
+      tsconfigPath: path.resolve(dirname, "tsconfig.json"),
+      outDir: "lib",
       insertTypesEntry: true,
-      exclude: ['**/*.spec.ts', '**/*.test.ts'],
-      rollupTypes: false
-    })
-  ]
+      exclude: ["**/*.spec.ts", "**/*.test.ts"],
+      rollupTypes: false,
+    }),
+  ],
 });
 ```
 
@@ -254,8 +255,8 @@ Ensure the app's Vite config doesn't cache dependencies. Add problematic package
 // apps/<app>/vite.config.ts
 export default defineConfig({
   optimizeDeps: {
-    exclude: ['<framework>', '<components>']
-  }
+    exclude: ["<framework>", "<components>"],
+  },
 });
 ```
 

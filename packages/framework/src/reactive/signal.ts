@@ -29,7 +29,7 @@ function cleanupEffect(effect: EffectRecord): void {
       try {
         cleanup();
       } catch (error) {
-        console.error('cleanup failed', error);
+        console.error("cleanup failed", error);
       }
     }
     effect.cleanups.length = 0;
@@ -58,21 +58,21 @@ export function createSignal<T>(initial: T, options?: SignalOptions<T>): Signal<
   };
 
   const write = (next: WriteValue<T>): T => {
-    const resolved = typeof next === 'function' ? (next as Updater<T>)(value) : next;
-    
+    const resolved = typeof next === "function" ? (next as Updater<T>)(value) : next;
+
     // Check equality
-    const hasChanged = equals === false 
-      ? true 
-      : typeof equals === 'function' 
-        ? !equals(value, resolved)
-        : !Object.is(resolved, value);
-    
+    const hasChanged = equals === false
+      ? true
+      : typeof equals === "function"
+      ? !equals(value, resolved)
+      : !Object.is(resolved, value);
+
     if (!hasChanged) {
       return value;
     }
-    
+
     value = resolved;
-    
+
     if (batchDepth > 0) {
       for (const effect of subscribers) {
         batchedEffects.add(effect);
@@ -110,7 +110,7 @@ export function createEffect(fn: () => void): () => void {
         cleanupStack = prevCleanup;
         currentEffect = prevEffect;
       }
-    }
+    },
   };
 
   effect.run();
