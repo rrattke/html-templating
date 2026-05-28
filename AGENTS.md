@@ -268,15 +268,27 @@ chore(misc): cleanup              # invented scope
 `dprint` owns formatting for TS, JS, JSON, YAML, Markdown. Config lives at [dprint.json](dprint.json). Run `npm run format` to
 auto-format and `npm run format:check` in CI.
 
-### Linting — ESLint flat config (natural severity)
+### Linting — fix-by-default
 
-[eslint.config.ts](eslint.config.ts) preserves upstream severities — correctness rules from `typescript-eslint`'s `recommended` and
-`recommendedTypeChecked` presets stay as `error` (red in editor); repo-specific style/convention nudges (imports, type-imports,
-unused-vars) are declared as `warn` (yellow in editor). ESLint is not part of the build chain, so `error` severity never blocks
-`npm run build` or `npm run dev`.
+Two linters run in lockstep:
 
-- `npm run lint` — reports both; exits non-zero only on errors, so it doesn't block local iteration on warnings.
-- `npm run lint:check` (CI) — adds `--max-warnings=0`; both errors and warnings fail the build.
+- **ESLint** ([eslint.config.ts](eslint.config.ts)) — TS/JS correctness and conventions.
+- **markdownlint-cli2** ([.markdownlint-cli2.jsonc](.markdownlint-cli2.jsonc)) — semantic markdown rules (duplicate headings, list
+  prefix continuity, etc.). Pure formatting (line length, list marker style, blank lines) is disabled here because dprint owns it.
+
+Scripts follow the same fix-by-default / explicit-check pattern as `format`:
+
+| Script                                   | Behavior                                          |
+| ---------------------------------------- | ------------------------------------------------- |
+| `npm run lint` (= `lint:js` + `lint:md`) | Auto-fix everything fixable; report what remains  |
+| `npm run lint:check` (CI)                | No fixing; ESLint adds `--max-warnings=0`; strict |
+| `npm run lint:js` / `lint:js:check`      | ESLint only — fix or check                        |
+| `npm run lint:md` / `lint:md:check`      | markdownlint only — fix or check                  |
+
+ESLint severity model — correctness rules from `typescript-eslint`'s `recommended` and `recommendedTypeChecked` presets stay as
+`error` (red in editor); repo-specific style/convention nudges (imports, type-imports, unused-vars) are declared as `warn` (yellow
+in editor). ESLint is not part of the build chain, so `error` severity never blocks `npm run build` or `npm run dev`.
+
 - Typed rules (`recommendedTypeChecked`) are scoped to `**/src/**/*.ts` only — config files and specs get the untyped rule set.
 - `import-x/extensions` enforces `.js` extension on relative imports (required for ESM).
 - `import-x/order` enforces external → internal → type grouping with blank-line separators.

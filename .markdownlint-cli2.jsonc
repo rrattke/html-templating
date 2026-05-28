@@ -1,0 +1,51 @@
+// markdownlint-cli2 configuration.
+//
+// Scope: semantic markdown rules only. Pure formatting (line length,
+// trailing whitespace, blank-line spacing, list marker style, etc.) is
+// owned by dprint via dprint.json. Rules in that overlap are disabled
+// here to avoid double-enforcement.
+//
+// Run `npm run lint:md` to auto-fix; `npm run lint:md:check` for CI.
+{
+  "config": {
+    "default": true,
+
+    // ── Disabled: owned by dprint ──────────────────────────────────
+    "line-length": false, // MD013 — dprint enforces lineWidth: 132
+    "no-trailing-spaces": false, // MD009
+    "no-multiple-blanks": false, // MD012
+    "ul-style": false, // MD004 — dprint sets unorderedListKind: dashes
+    "ul-indent": false, // MD007
+    "list-marker-space": false, // MD030
+    "blanks-around-headings": false, // MD022
+    "blanks-around-fences": false, // MD031
+    "blanks-around-lists": false, // MD032
+    "no-multiple-space-atx": false, // MD019
+    "no-missing-space-atx": false, // MD018
+    "fenced-code-language": false, // MD040 — handled informally; let dprint pass them through
+    "emphasis-style": false, // MD049 — dprint sets emphasisKind: asterisks
+    "strong-style": false, // MD050 — dprint sets strongKind: asterisks
+    "table-pipe-style": false, // MD055
+    "table-column-count": false, // MD056
+
+    // ── Tweaked: project conventions ───────────────────────────────
+    "first-line-heading": false, // MD041 — some docs start with frontmatter or context
+    "no-inline-html": false, // MD033 — diagrams and SVG markers are common
+    "no-duplicate-heading": { "siblings_only": true }, // MD024 — allow repeated sub-headings under different parents
+    "code-block-style": { "style": "fenced" }, // MD046
+    "heading-style": { "style": "atx" } // MD003
+  },
+  "globs": [
+    "**/*.md"
+  ],
+  "ignores": [
+    "**/node_modules/**",
+    "**/lib/**",
+    "**/bin/**",
+    "**/dist/**",
+    "**/.vite/**",
+    "**/coverage/**",
+    "CHANGELOG.md",
+    "docs/todos-esw-thomas.md"
+  ]
+}

@@ -147,11 +147,11 @@ Safer v1 options:
 
 Runtime looks up `ctx.remove` and calls it with the resolved argument.
 
-2. **Custom events only** (the component emits, the app listens outside)
+1. **Custom events only** (the component emits, the app listens outside)
 
 For many UI elements, you can avoid binding event handlers in the template entirely.
 
-3. **Allow a constrained expression model**
+1. **Allow a constrained expression model**
 
 Support only `fnName(argPath)` where `fnName` must exist on the context and `argPath` must be a property path.
 
