@@ -25,7 +25,7 @@ describe("Template to Part Translation", () => {
   describe("Event Listeners (@prefix)", () => {
     it("should create EventAttributePart for @click", () => {
       const template = html`<button @click=${() => {}}>Click</button>`;
-      const partsTemplate = template.getTemplate();
+      const partsTemplate = template.template;
       const instance = TemplateInstance.create(dummyRuntime, partsTemplate, [() => {}]);
 
       expect(instance.parts).toHaveLength(1);
@@ -34,7 +34,7 @@ describe("Template to Part Translation", () => {
 
     it("should create EventAttributePart for @input", () => {
       const template = html`<input @input=${() => {}}>`;
-      const partsTemplate = template.getTemplate();
+      const partsTemplate = template.template;
       const instance = TemplateInstance.create(dummyRuntime, partsTemplate, [() => {}]);
 
       expect(instance.parts).toHaveLength(1);
@@ -43,7 +43,7 @@ describe("Template to Part Translation", () => {
 
     it("should create EventAttributePart for @change", () => {
       const template = html`<input @change=${() => {}}>`;
-      const partsTemplate = template.getTemplate();
+      const partsTemplate = template.template;
       const instance = TemplateInstance.create(dummyRuntime, partsTemplate, [() => {}]);
 
       expect(instance.parts).toHaveLength(1);
@@ -52,7 +52,7 @@ describe("Template to Part Translation", () => {
 
     it("should create EventAttributePart for custom event @customevent", () => {
       const template = html`<div @customevent=${() => {}}>Custom</div>`;
-      const partsTemplate = template.getTemplate();
+      const partsTemplate = template.template;
       const instance = TemplateInstance.create(dummyRuntime, partsTemplate, [() => {}]);
 
       expect(instance.parts).toHaveLength(1);
@@ -61,7 +61,7 @@ describe("Template to Part Translation", () => {
 
     it("should create multiple EventAttributeParts for multiple event handlers", () => {
       const template = html`<button @click=${() => {}} @mouseenter=${() => {}}>Hover</button>`;
-      const partsTemplate = template.getTemplate();
+      const partsTemplate = template.template;
       const instance = TemplateInstance.create(dummyRuntime, partsTemplate, [() => {}, () => {}]);
 
       expect(instance.parts).toHaveLength(2);
@@ -73,7 +73,7 @@ describe("Template to Part Translation", () => {
   describe("Property Bindings (.prefix)", () => {
     it("should create PropertyAttributePart for .value", () => {
       const template = html`<input .value=${"text"}>`;
-      const partsTemplate = template.getTemplate();
+      const partsTemplate = template.template;
       const instance = TemplateInstance.create(dummyRuntime, partsTemplate, ["text"]);
 
       expect(instance.parts).toHaveLength(1);
@@ -82,7 +82,7 @@ describe("Template to Part Translation", () => {
 
     it("should create PropertyAttributePart for .checked", () => {
       const template = html`<input .checked=${true}>`;
-      const partsTemplate = template.getTemplate();
+      const partsTemplate = template.template;
       const instance = TemplateInstance.create(dummyRuntime, partsTemplate, [true]);
 
       expect(instance.parts).toHaveLength(1);
@@ -91,7 +91,7 @@ describe("Template to Part Translation", () => {
 
     it("should create PropertyAttributePart for .disabled", () => {
       const template = html`<button .disabled=${false}>Click</button>`;
-      const partsTemplate = template.getTemplate();
+      const partsTemplate = template.template;
       const instance = TemplateInstance.create(dummyRuntime, partsTemplate, [false]);
 
       expect(instance.parts).toHaveLength(1);
@@ -100,7 +100,7 @@ describe("Template to Part Translation", () => {
 
     it("should create PropertyAttributePart for custom property", () => {
       const template = html`<div .customProp=${"value"}>Custom</div>`;
-      const partsTemplate = template.getTemplate();
+      const partsTemplate = template.template;
       const instance = TemplateInstance.create(dummyRuntime, partsTemplate, ["value"]);
 
       expect(instance.parts).toHaveLength(1);
@@ -109,7 +109,7 @@ describe("Template to Part Translation", () => {
 
     it("should create multiple PropertyAttributeParts", () => {
       const template = html`<input .value=${"text"} .disabled=${false}>`;
-      const partsTemplate = template.getTemplate();
+      const partsTemplate = template.template;
       const instance = TemplateInstance.create(dummyRuntime, partsTemplate, ["text", false]);
 
       expect(instance.parts).toHaveLength(2);
@@ -121,7 +121,7 @@ describe("Template to Part Translation", () => {
   describe("Boolean Attributes (?prefix)", () => {
     it("should create BooleanAttributePart for ?disabled", () => {
       const template = html`<button ?disabled=${true}>Click</button>`;
-      const partsTemplate = template.getTemplate();
+      const partsTemplate = template.template;
       const instance = TemplateInstance.create(dummyRuntime, partsTemplate, [true]);
 
       expect(instance.parts).toHaveLength(1);
@@ -130,7 +130,7 @@ describe("Template to Part Translation", () => {
 
     it("should create BooleanAttributePart for ?checked", () => {
       const template = html`<input ?checked=${false}>`;
-      const partsTemplate = template.getTemplate();
+      const partsTemplate = template.template;
       const instance = TemplateInstance.create(dummyRuntime, partsTemplate, [false]);
 
       expect(instance.parts).toHaveLength(1);
@@ -139,7 +139,7 @@ describe("Template to Part Translation", () => {
 
     it("should create BooleanAttributePart for ?hidden", () => {
       const template = html`<div ?hidden=${true}>Hidden</div>`;
-      const partsTemplate = template.getTemplate();
+      const partsTemplate = template.template;
       const instance = TemplateInstance.create(dummyRuntime, partsTemplate, [true]);
 
       expect(instance.parts).toHaveLength(1);
@@ -148,7 +148,7 @@ describe("Template to Part Translation", () => {
 
     it("should create BooleanAttributePart for ?readonly", () => {
       const template = html`<input ?readonly=${true}>`;
-      const partsTemplate = template.getTemplate();
+      const partsTemplate = template.template;
       const instance = TemplateInstance.create(dummyRuntime, partsTemplate, [true]);
 
       expect(instance.parts).toHaveLength(1);
@@ -157,7 +157,7 @@ describe("Template to Part Translation", () => {
 
     it("should create multiple BooleanAttributeParts", () => {
       const template = html`<button ?disabled=${false} ?hidden=${true}>Click</button>`;
-      const partsTemplate = template.getTemplate();
+      const partsTemplate = template.template;
       const instance = TemplateInstance.create(dummyRuntime, partsTemplate, [false, true]);
 
       expect(instance.parts).toHaveLength(2);
@@ -169,7 +169,7 @@ describe("Template to Part Translation", () => {
   describe("Standard Attributes (no prefix)", () => {
     it("should create StandardAttributePart for regular class attribute", () => {
       const template = html`<div class=${"container"}>Content</div>`;
-      const partsTemplate = template.getTemplate();
+      const partsTemplate = template.template;
       const instance = TemplateInstance.create(dummyRuntime, partsTemplate, ["container"]);
 
       expect(instance.parts).toHaveLength(1);
@@ -178,7 +178,7 @@ describe("Template to Part Translation", () => {
 
     it("should create StandardAttributePart for id attribute", () => {
       const template = html`<div id=${"myid"}>Content</div>`;
-      const partsTemplate = template.getTemplate();
+      const partsTemplate = template.template;
       const instance = TemplateInstance.create(dummyRuntime, partsTemplate, ["myid"]);
 
       expect(instance.parts).toHaveLength(1);
@@ -187,7 +187,7 @@ describe("Template to Part Translation", () => {
 
     it("should create StandardAttributePart for data attribute", () => {
       const template = html`<div data-test=${"value"}>Content</div>`;
-      const partsTemplate = template.getTemplate();
+      const partsTemplate = template.template;
       const instance = TemplateInstance.create(dummyRuntime, partsTemplate, ["value"]);
 
       expect(instance.parts).toHaveLength(1);
@@ -196,7 +196,7 @@ describe("Template to Part Translation", () => {
 
     it("should create StandardAttributePart for aria attribute", () => {
       const template = html`<button aria-label=${"Click me"}>Click</button>`;
-      const partsTemplate = template.getTemplate();
+      const partsTemplate = template.template;
       const instance = TemplateInstance.create(dummyRuntime, partsTemplate, ["Click me"]);
 
       expect(instance.parts).toHaveLength(1);
@@ -205,7 +205,7 @@ describe("Template to Part Translation", () => {
 
     it("should create multiple StandardAttributeParts", () => {
       const template = html`<div class=${"container"} id=${"myid"}>Content</div>`;
-      const partsTemplate = template.getTemplate();
+      const partsTemplate = template.template;
       const instance = TemplateInstance.create(dummyRuntime, partsTemplate, ["container", "myid"]);
 
       expect(instance.parts).toHaveLength(2);
@@ -217,7 +217,7 @@ describe("Template to Part Translation", () => {
   describe("Mixed Attribute Types", () => {
     it("should create correct parts for event, property, and boolean attributes", () => {
       const template = html`<button @click=${() => {}} .disabled=${false} ?hidden=${true}>Click</button>`;
-      const partsTemplate = template.getTemplate();
+      const partsTemplate = template.template;
       const instance = TemplateInstance.create(dummyRuntime, partsTemplate, [() => {}, false, true]);
 
       expect(instance.parts).toHaveLength(3);
@@ -233,7 +233,7 @@ describe("Template to Part Translation", () => {
         .value=${"text"}
         ?disabled=${false}
       >`;
-      const partsTemplate = template.getTemplate();
+      const partsTemplate = template.template;
       const instance = TemplateInstance.create(dummyRuntime, partsTemplate, ["input", () => {}, "text", false]);
 
       expect(instance.parts).toHaveLength(4);
@@ -250,7 +250,7 @@ describe("Template to Part Translation", () => {
         <div ?hidden=${true}>Hidden</div>
         <span class=${"text"}>Text</span>
       `;
-      const partsTemplate = template.getTemplate();
+      const partsTemplate = template.template;
       const instance = TemplateInstance.create(dummyRuntime, partsTemplate, [() => {}, "text", true, "text"]);
 
       expect(instance.parts).toHaveLength(4);
