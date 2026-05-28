@@ -268,11 +268,15 @@ chore(misc): cleanup              # invented scope
 `dprint` owns formatting for TS, JS, JSON, YAML, Markdown. Config lives at [dprint.json](dprint.json). Run `npm run format` to
 auto-format and `npm run format:check` in CI.
 
-### Linting — ESLint flat config (warn-only)
+### Linting — ESLint flat config (natural severity)
 
-[eslint.config.ts](eslint.config.ts) declares every rule as `warn`, including upstream `error` rules (downgraded programmatically).
-The CI script `lint:check` adds `--max-warnings=0` so warnings still gate merges, but local dev work is never blocked.
+[eslint.config.ts](eslint.config.ts) preserves upstream severities — correctness rules from `typescript-eslint`'s `recommended` and
+`recommendedTypeChecked` presets stay as `error` (red in editor); repo-specific style/convention nudges (imports, type-imports,
+unused-vars) are declared as `warn` (yellow in editor). ESLint is not part of the build chain, so `error` severity never blocks
+`npm run build` or `npm run dev`.
 
+- `npm run lint` — reports both; exits non-zero only on errors, so it doesn't block local iteration on warnings.
+- `npm run lint:check` (CI) — adds `--max-warnings=0`; both errors and warnings fail the build.
 - Typed rules (`recommendedTypeChecked`) are scoped to `**/src/**/*.ts` only — config files and specs get the untyped rule set.
 - `import-x/extensions` enforces `.js` extension on relative imports (required for ESM).
 - `import-x/order` enforces external → internal → type grouping with blank-line separators.

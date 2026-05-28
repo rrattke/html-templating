@@ -1,15 +1,26 @@
 //
-// ESLint flat config — uniform `warn` severity.
+// ESLint flat config.
+//
+// Severity model — natural two-tier:
+//
+//   * `error` (red in editor)   — correctness bugs from upstream presets
+//                                 (typescript-eslint recommended +
+//                                 recommendedTypeChecked). These are
+//                                 things you almost certainly want to fix
+//                                 before merging.
+//   * `warn`  (yellow in editor) — style nudges and repo conventions
+//                                 declared in the overrides block below.
+//
+// ESLint is NOT part of the build chain (Vite/Rolldown don't invoke it),
+// so `error` severity never blocks `npm run build` or `npm run dev`.
 //
 // Workflow:
-//   * Editor + `npm run lint`        → warnings only, never blocks dev work.
-//   * `npm run lint:check` (CI)       → adds `--max-warnings=0`, every warning
-//                                    becomes a build failure.
-//
-// Rule severity is therefore a single bit at the *script* level, not a
-// per-rule choice in this file. To keep that invariant, we downgrade every
-// `error` from upstream presets (typescript-eslint recommended +
-// recommended-type-checked) to `warn` via the `toWarn` helper below.
+//   * Editor          → red squiggles for errors, yellow for warnings,
+//                       exactly as the preset authors intended.
+//   * `npm run lint`  → reports both; exit code reflects errors only,
+//                       so it doesn't block local iteration on warnings.
+//   * `npm run lint:check` (CI) → adds `--max-warnings=0`; both errors
+//                                 and warnings fail the build.
 //
 // Pure formatting rules (quotes, semicolons, trailing commas, indent,
 // line breaks) are NOT declared here — dprint owns formatting via
@@ -20,28 +31,6 @@ import { defineConfig } from "eslint/config";
 import importX from "eslint-plugin-import-x";
 
 import type { Linter } from "eslint";
-
-type RuleSetting = Linter.RuleEntry;
-
-/** Downgrade an ESLint rule severity (`error` / `2`) to `warn`; leave `off` alone. */
-function downgradeSeverity(setting: RuleSetting): RuleSetting {
-  const severity = Array.isArray(setting) ? setting[0] : setting;
-  if (severity === "off" || severity === 0) {
-    return setting;
-  }
-  return Array.isArray(setting) ? ["warn", ...setting.slice(1)] : "warn";
-}
-
-/** Map every rule in a flat-config block to `warn` severity. */
-function toWarn(block: Linter.Config): Linter.Config {
-  if (!block.rules) {
-    return block;
-  }
-  const downgraded = Object.fromEntries(
-    Object.entries(block.rules).map(([name, setting]) => [name, downgradeSeverity(setting as RuleSetting)]),
-  );
-  return { ...block, rules: downgraded };
-}
 
 /** Scope a config block to the given file globs. */
 function scope(files: string[], block: Linter.Config): Linter.Config {
@@ -66,9 +55,9 @@ export default defineConfig(
     ],
   },
   // Untyped rule set — applies to every .ts file (including configs and specs).
-  ...tseslint.configs.recommended.map(toWarn),
+  ...tseslint.configs.recommended,
   // Typed rule set — only for package source files.
-  ...tseslint.configs.recommendedTypeChecked.map((block) => toWarn(scope(TYPED_FILES, block))),
+  ...tseslint.configs.recommendedTypeChecked.map((block) => scope(TYPED_FILES, block)),
   {
     files: TYPED_FILES,
     ignores: TYPED_FILE_EXCLUDES,
@@ -87,6 +76,7 @@ export default defineConfig(
   },
   // Import hygiene — relative imports must end in `.js`, type-only imports
   // grouped above value imports, and groups separated by a blank line.
+  // These are repo conventions, not correctness — keep as `warn`.
   {
     plugins: { "import-x": importX },
     rules: {
@@ -115,10 +105,9 @@ export default defineConfig(
       "import-x/no-duplicates": "warn",
     },
   },
-  // Repo-specific overrides.
+  // Repo-specific overrides — style/convention nudges as `warn`.
   {
     rules: {
-      // ── Imports ────────────────────────────────────────────────────
       "@typescript-eslint/consistent-type-imports": [
         "warn",
         {
@@ -127,12 +116,8 @@ export default defineConfig(
           disallowTypeAnnotations: false,
         },
       ],
-
-      // ── Language idioms ────────────────────────────────────────────
       "prefer-template": "warn",
       "object-shorthand": "warn",
-
-      // ── Correctness ────────────────────────────────────────────────
       "@typescript-eslint/no-unused-vars": [
         "warn",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
