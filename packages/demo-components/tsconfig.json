@@ -5,6 +5,7 @@
     "rootDir": "./src",
     "moduleResolution": "NodeNext",
     "paths": {
+      "~/*": ["./src/*"],
       "@vanishing/framework": ["../framework/lib/index.d.ts"],
       "@vanishing/framework/*": ["../framework/lib/*.d.ts"]
     }

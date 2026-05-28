@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "vite build && vite preview"
+    "start": "vite build && vite preview",
+    "clean": "rm -rf bin"
   },
   "dependencies": {
     "@demo/components": "*",
@@ -16,6 +17,6 @@
   },
   "devDependencies": {
     "@types/node": "^22.19.5",
-    "vite": "^5.4.21"
+    "vite": "^8.0.1"
   }
 }

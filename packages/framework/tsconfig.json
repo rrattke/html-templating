@@ -4,7 +4,10 @@
     "outDir": "lib",
     "rootDir": "src",
     "moduleResolution": "NodeNext",
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "paths": {
+      "~/*": ["./src/*"]
+    }
   },
   "include": ["src"],
   "exclude": ["lib"]
