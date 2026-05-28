@@ -168,7 +168,7 @@ Common language identifiers:
 
 ### When to Use `text`
 
-Use ` ```text ` for:
+Use `` ```text `` for:
 
 - ASCII diagrams or flowcharts
 - Generic output or logs
@@ -206,3 +206,108 @@ Use backticks for:
 - Track DOM mutations by spying on methods like `extractContent`
 - Verify DOM identity preservation for reconciliation tests
 - Use data attributes (`data-id`) to identify elements in tests
+
+---
+
+## Branches & Commits
+
+### Branch names
+
+Pattern: **`<type>/<short-slug>`** — kebab-case, ≤ 50 chars, no author prefix.
+
+```text
+feat/keyed-list-reconciliation
+fix/template-cache-leak
+docs/reactive-architecture
+```
+
+### Commit messages
+
+[Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/): **`<type>(<scope>): <subject>`** — imperative, ≤ 72
+chars, no period.
+
+```text
+feat(template): cache template instances by literal
+fix(wc): release effect disposer on disconnect
+refactor(runtime): extract NodeRange helper
+```
+
+### Allowed types
+
+`feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `ci`, `perf`, `build`.
+
+### Allowed scopes
+
+`framework`, `wc`, `runtime`, `template`, `reactive`, `demo`, `apps`, `docs`, `infra`, `ci`.
+
+Omit the scope when the change genuinely spans many; never invent a new scope ad-hoc — add it to this list first in a separate
+commit.
+
+### Anti-examples
+
+```text
+feature/AddSearchBar              # wrong type word, PascalCase slug
+fix-1234                          # missing type prefix
+Fixed bug in renderer             # not imperative, no type/scope
+feat: add stuff                   # vague subject
+chore(misc): cleanup              # invented scope
+```
+
+### Agent-specific rules
+
+- **Propose the branch name and commit message in the plan before executing.**
+- **Use the scope that matches the files you changed.** If the change spans multiple scopes, split into multiple commits or omit the
+  scope.
+
+---
+
+## Tooling
+
+### Formatting — dprint
+
+`dprint` owns formatting for TS, JS, JSON, YAML, Markdown. Config lives at [dprint.json](dprint.json). Run `npm run format` to
+auto-format and `npm run format:check` in CI.
+
+### Linting — ESLint flat config (warn-only)
+
+[eslint.config.ts](eslint.config.ts) declares every rule as `warn`, including upstream `error` rules (downgraded programmatically).
+The CI script `lint:ts:check` adds `--max-warnings=0` so warnings still gate merges, but local dev work is never blocked.
+
+- Typed rules (`recommendedTypeChecked`) are scoped to `**/src/**/*.ts` only — config files and specs get the untyped rule set.
+- `import-x/extensions` enforces `.js` extension on relative imports (required for ESM).
+- `import-x/order` enforces external → internal → type grouping with blank-line separators.
+- `consistent-type-imports` auto-splits type imports into separate `import type` statements.
+
+### Build — Vite 8 / Rolldown
+
+All packages and apps use **Vite 8**, which ships with **Rolldown** (Rust bundler) instead of Rollup. Notes:
+
+- Build target is **ES2024** everywhere. The old `esbuild: { target: 'es2022', keepNames: true }` workaround for the TC39 `accessor`
+  keyword is no longer needed — Rolldown parses it natively.
+- Library configs use `rolldownOptions` (not `rollupOptions`).
+- External deps are filtered with a function: `(id) => !(id.startsWith(".") || id.startsWith("~") || path.isAbsolute(id))`. Reads as
+  "external unless relative, aliased, or absolute" — cross-platform (handles Windows drive letters).
+- `dts({ rollupTypes: false })` — do not roll declarations into one file. Per-file `.d.ts` avoids name collisions on globals
+  (`Disposable`, `MessageChannel`, etc.).
+- `vite-plugin-checker` runs `tsc --noEmit` during `vite build --watch` (`enableBuild: false` keeps prod builds fast).
+
+### Path alias — `~/`
+
+Every package configures `~/` to resolve to its own `src/`:
+
+- `vite.config.ts`: `resolve: { alias: { "~": path.resolve(dirname, "src") } }`
+- `tsconfig.json`: `"paths": { "~/*": ["./src/*"] }`
+
+Prefer `~/Foo.js` over `../../Foo.js` for cross-directory imports inside a package.
+
+### Script naming — `{verb}:{category}:{name}`
+
+Root [package.json](package.json) scripts follow this pattern:
+
+| Category | Purpose                        |
+| -------- | ------------------------------ |
+| `lib`    | Buildable libraries            |
+| `app`    | Runnable apps (vite dev/build) |
+
+Aggregates: `build:lib`, `build:app`, `build`. Each is implemented with `npm-run-all2` (`run-s` for sequential, `run-p` for
+parallel) instead of `&&` / `concurrently` / `wait-on`.
