@@ -8,7 +8,15 @@
     "build": "vite build",
     "preview": "vite preview",
     "start": "vite build && vite preview",
-    "clean": "rm -rf bin"
+    "clean": "rm -rf bin",
+    "format": "dprint fmt \"**/*\"",
+    "format:check": "dprint check \"**/*\"",
+    "lint": "run-p lint:js lint:md",
+    "lint:check": "run-p lint:js:check lint:md:check",
+    "lint:js": "eslint . --fix",
+    "lint:js:check": "eslint . --max-warnings=0",
+    "lint:md": "markdownlint-cli2 --config ../../.markdownlint-cli2.jsonc --fix \"**/*.md\"",
+    "lint:md:check": "markdownlint-cli2 --config ../../.markdownlint-cli2.jsonc \"**/*.md\""
   },
   "dependencies": {
     "@vanishing/framework": "^0.1.0"

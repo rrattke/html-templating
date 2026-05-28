@@ -265,16 +265,23 @@ chore(misc): cleanup              # invented scope
 
 ### Formatting — dprint
 
-`dprint` owns formatting for TS, JS, JSON, YAML, Markdown. Config lives at [dprint.json](dprint.json). Run `npm run format` to
-auto-format and `npm run format:check` in CI.
+`dprint` owns formatting for TS, JS, JSON, YAML, Markdown. Config lives at [dprint.json](dprint.json) — single source of truth for
+the whole repo. Run `npm run format` to auto-format and `npm run format:check` in CI.
+
+**Distributed per-workspace**: every workspace package owns its own `format` / `format:check` script that runs `dprint fmt "**/*"`
+scoped to its own directory (CLI args override `includes`; root config's `excludes` still apply). The root `format` script simply
+delegates via `npm run format --workspaces --if-present` — npm runs workspaces sequentially, but each workspace's own `format` is
+parallelized internally where applicable.
 
 ### Linting — fix-by-default
 
 Two linters run in lockstep:
 
-- **ESLint** ([eslint.config.ts](eslint.config.ts)) — TS/JS correctness and conventions.
+- **ESLint** ([eslint.config.ts](eslint.config.ts)) — TS/JS correctness and conventions. Flat config auto-discovers up the tree, so
+  per-workspace `eslint .` uses the root config.
 - **markdownlint-cli2** ([.markdownlint-cli2.jsonc](.markdownlint-cli2.jsonc)) — semantic markdown rules (duplicate headings, list
-  prefix continuity, etc.). Pure formatting (line length, list marker style, blank lines) is disabled here because dprint owns it.
+  prefix continuity, etc.). Pure formatting is disabled here because dprint owns it. **Does not walk up**, so per-workspace scripts
+  pass `--config ../../.markdownlint-cli2.jsonc` explicitly.
 
 Scripts follow the same fix-by-default / explicit-check pattern as `format`:
 
@@ -284,6 +291,14 @@ Scripts follow the same fix-by-default / explicit-check pattern as `format`:
 | `npm run lint:check` (CI)                | No fixing; ESLint adds `--max-warnings=0`; strict |
 | `npm run lint:js` / `lint:js:check`      | ESLint only — fix or check                        |
 | `npm run lint:md` / `lint:md:check`      | markdownlint only — fix or check                  |
+
+**Distributed per-workspace**: every workspace package owns `lint` / `lint:check` / `lint:js[:check]` / `lint:md[:check]` scoped to
+itself. Each package's `lint` uses `run-p lint:js lint:md` (two linters in parallel). The root `lint` delegates to all workspaces
+via `npm run lint --workspaces --if-present` (sequential across workspaces, parallel within each).
+
+This means a single workspace can be linted/formatted in isolation (`cd packages/framework && npm run lint`) without touching the
+rest of the repo. Root-only files (root `README.md`, `AGENTS.md`, `docs/**`, configs) are not covered by these scripts — run dprint
+or markdownlint-cli2 directly from the repo root for those.
 
 ESLint severity model — correctness rules from `typescript-eslint`'s `recommended` and `recommendedTypeChecked` presets stay as
 `error` (red in editor); repo-specific style/convention nudges (imports, type-imports, unused-vars) are declared as `warn` (yellow

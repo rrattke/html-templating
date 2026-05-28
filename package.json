@@ -28,14 +28,10 @@
     "start:static": "run-s build:lib:framework build:app:static && npm run preview -w static-example",
     "test": "npm test --workspaces --if-present",
     "clean": "npm run clean --workspaces --if-present",
-    "lint": "run-s lint:js lint:md",
-    "lint:check": "run-s lint:js:check lint:md:check",
-    "lint:js": "eslint . --fix",
-    "lint:js:check": "eslint . --max-warnings=0",
-    "lint:md": "markdownlint-cli2 --fix",
-    "lint:md:check": "markdownlint-cli2",
-    "format": "dprint fmt",
-    "format:check": "dprint check",
+    "lint": "npm run lint --workspaces --if-present",
+    "lint:check": "npm run lint:check --workspaces --if-present",
+    "format": "npm run format --workspaces --if-present",
+    "format:check": "npm run format:check --workspaces --if-present",
     "check": "run-s format:check lint:check test"
   },
   "devDependencies": {
