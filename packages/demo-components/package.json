@@ -41,11 +41,19 @@
     "@vanishing/framework": "*"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.7",
+    "dprint": "^0.54.0",
+    "eslint": "^10.4.0",
+    "eslint-plugin-import-x": "^4.16.2",
+    "jiti": "^2.7.0",
     "jsdom": "^29.1.1",
-    "typescript": "^5.7.3",
-    "vite": "^8.0.1",
-    "vite-plugin-checker": "^0.12.0",
-    "vite-plugin-dts": "^4.5.4",
-    "vitest": "^4.1.0"
+    "markdownlint-cli2": "^0.22.1",
+    "npm-run-all2": "^9.0.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.60.0",
+    "vite": "^8.0.14",
+    "vite-plugin-checker": "^0.14.1",
+    "vite-plugin-dts": "^5.0.1",
+    "vitest": "^4.1.7"
   }
 }
