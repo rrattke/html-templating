@@ -1,5 +1,6 @@
 import { Reactive, state, Styleable } from "@vanishing/framework/wc";
 import { html } from "@vanishing/framework/template";
+
 import styles from "./counter.css?inline";
 
 export class Counter extends Styleable(Reactive(HTMLElement)) {

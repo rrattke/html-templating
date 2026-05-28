@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
+
 import { DynamicBinding } from "./render.js";
 import { getTemplate, resolvePath } from "./template.js";
 
-const dummyRuntime = { effect: (fn: () => void) => fn() } as any;
+import type { SignalsRuntime } from "../runtime.js";
+
+const dummyRuntime = { effect: (fn: () => void) => fn() } as unknown as SignalsRuntime;
 const html = DynamicBinding.with(dummyRuntime);
 
 describe("html template function", () => {

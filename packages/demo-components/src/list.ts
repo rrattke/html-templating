@@ -1,5 +1,6 @@
 import { Reactive, state, Styleable } from "@vanishing/framework/wc";
 import { html } from "@vanishing/framework/template";
+
 import styles from "./list.css?inline";
 
 export class List extends Styleable(Reactive(HTMLElement)) {
@@ -59,7 +60,7 @@ export class List extends Styleable(Reactive(HTMLElement)) {
       </div>
       <ul>
         ${() =>
-      this.items.map((item, index) =>
+      this.items.map((item, _index) =>
         html(item.id)`
           <li>
             <span>${item.label}</span>

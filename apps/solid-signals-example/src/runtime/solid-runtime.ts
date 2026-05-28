@@ -7,7 +7,8 @@ import {
   onCleanup as solidOnCleanup,
   untrack as solidUntrack,
 } from "solid-js";
-import { SignalsRuntime } from "@vanishing/framework/runtime";
+
+import type { SignalsRuntime } from "@vanishing/framework/runtime";
 
 export const solidRuntime: SignalsRuntime = {
   effect(run) {

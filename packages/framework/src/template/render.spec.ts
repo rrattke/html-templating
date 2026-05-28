@@ -4,8 +4,11 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import { DynamicBinding, TemplateInstance } from "./render.js";
 import { BooleanAttributePart, EventAttributePart, PropertyAttributePart, StandardAttributePart } from "./parts.js";
+
+import type { SignalsRuntime } from "../runtime.js";
 
 describe("Template to Part Translation", () => {
   // Create a mock runtime for testing
@@ -14,7 +17,7 @@ describe("Template to Part Translation", () => {
       fn();
       return () => {};
     },
-  } as any;
+  } as unknown as SignalsRuntime;
 
   // Create the html function for the mock runtime
   const html = DynamicBinding.with(dummyRuntime);
@@ -268,7 +271,7 @@ describe("Nested Templates", () => {
       fn();
       return () => {};
     },
-  } as any;
+  } as unknown as SignalsRuntime;
 
   // Create the html function for the mock runtime
   const html = DynamicBinding.with(dummyRuntime);
@@ -368,7 +371,7 @@ describe("Template Iteration", () => {
       fn();
       return () => {};
     },
-  } as any;
+  } as unknown as SignalsRuntime;
 
   // Create the html function for the mock runtime
   const html = DynamicBinding.with(dummyRuntime);
@@ -693,7 +696,7 @@ describe("Style Tag Rendering", () => {
       fn();
       return () => {};
     },
-  } as any;
+  } as unknown as SignalsRuntime;
 
   const html = DynamicBinding.with(dummyRuntime);
 
@@ -778,7 +781,7 @@ describe("Keyed Templates", () => {
       fn();
       return () => {};
     },
-  } as any;
+  } as unknown as SignalsRuntime;
 
   const html = DynamicBinding.with(dummyRuntime);
 
@@ -827,7 +830,7 @@ describe("Multi-Expression Text Templates", () => {
       fn();
       return () => {};
     },
-  } as any;
+  } as unknown as SignalsRuntime;
 
   const html = DynamicBinding.with(dummyRuntime);
 
@@ -874,7 +877,7 @@ describe("Multi-Expression Text Templates", () => {
         fn();
         return () => {};
       },
-    } as any;
+    } as unknown as SignalsRuntime;
     const reactiveHtml = DynamicBinding.with(reactiveRuntime);
     const template = reactiveHtml`<div class="${() => class1} ${() => class2}"></div>`;
 
@@ -922,7 +925,7 @@ describe("Boolean Attribute Binding", () => {
       fn();
       return () => {};
     },
-  } as any;
+  } as unknown as SignalsRuntime;
 
   const html = DynamicBinding.with(dummyRuntime);
 
@@ -1005,7 +1008,7 @@ describe("StaticBinding.render()", () => {
       fn();
       return () => {};
     },
-  } as any;
+  } as unknown as SignalsRuntime;
 
   const html = DynamicBinding.with(staticRuntime);
 
@@ -1137,7 +1140,7 @@ describe("List Reconciliation - DOM Identity Preservation", () => {
         if (index >= 0) { effectCallbacks.splice(index, 1); }
       };
     },
-  } as any;
+  } as unknown as SignalsRuntime;
 
   const html = DynamicBinding.with(trackingRuntime);
 

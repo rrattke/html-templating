@@ -4,13 +4,15 @@
  */
 
 import { NodeRange } from "./dom.js";
-import { getTemplate, Template } from "./template.js";
+import { getTemplate } from "./template.js";
 import {
   createParts,
   EventAttributePart,
   NodePart,
   type Part,
 } from "./parts.js";
+
+import type { Template } from "./template.js";
 import type { SignalsRuntime } from "../runtime.js";
 
 /**
@@ -100,7 +102,7 @@ export class DynamicBinding extends StaticBinding {
   ):
     & ((strings: readonly string[], ...values: unknown[]) => DynamicBinding)
     & ((id?: unknown) => (strings: readonly string[], ...values: unknown[]) => DynamicBinding) {
-    const htmlFunction = ((stringsOrId?: readonly string[] | unknown, ...values: unknown[]) => {
+    const htmlFunction = ((stringsOrId?: unknown, ...values: unknown[]) => {
       // If called as a template tag: html``
       if (Array.isArray(stringsOrId) && "raw" in stringsOrId) {
         return new DynamicBinding(stringsOrId as readonly string[], values, runtime);

@@ -1,6 +1,9 @@
 /**
  * A constructor type for classes that can be mixed with Styleable.
  */
+// Mixin constructor signature — `any[]` is the standard TS pattern; narrowing to
+// `unknown[]` breaks base-constructor compatibility checks with HTMLElement.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Constructor<T = object> = abstract new(...args: any[]) => T;
 
 /**
@@ -40,8 +43,7 @@ export interface StyleableInstance {
   customStyles?: CSSStyleSheet | string;
 }
 
-// Cache for converted stylesheets
-const sheetCache = new WeakMap<object, CSSStyleSheet>();
+// Cache for converted stylesheets (keyed by CSS source string)
 const stringSheetCache = new Map<string, CSSStyleSheet>();
 
 /**

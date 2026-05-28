@@ -3,10 +3,10 @@
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
+
 import {
   ATTRIBUTE_BINDING,
   EventAttributePart,
-  NodePart,
   PROPERTY_BINDING,
   PropertyAttributePart,
   StandardAttributePart,

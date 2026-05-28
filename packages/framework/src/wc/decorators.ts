@@ -1,17 +1,20 @@
 import type { SignalsRuntime } from "../runtime.js";
 import type { Signal } from "../reactive/signal.js";
 
-function state<This, Value>(runtime: SignalsRuntime) {
-  return function<This, Value>(
+function state(runtime: SignalsRuntime) {
+  return function decorate<This, Value>(
     target: ClassAccessorDecoratorTarget<This, Value>,
+    _context: ClassAccessorDecoratorContext<This, Value>,
   ): ClassAccessorDecoratorResult<This, Value> {
+    // The accessor's `get` is a closure-typed property, not a bound method.
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     const { get: getStorage } = target as unknown as ClassAccessorDecoratorTarget<This, Signal<Value>>;
 
     return {
-      init(this: This, initialValue: Value): any {
-        const signal = runtime.createSignal(initialValue);
-        // Return the signal directly - the decorator infrastructure will store it
-        return signal;
+      init(this: This, initialValue: Value): Value {
+        // The decorator infrastructure stores whatever init returns; we store a signal
+        // and read/write through it via the get/set accessors below.
+        return runtime.createSignal(initialValue) as unknown as Value;
       },
       get(this: This): Value {
         const signal = getStorage.call(this);
@@ -28,7 +31,11 @@ function state<This, Value>(runtime: SignalsRuntime) {
 }
 
 export const StateDecorator = {
-  with: state,
+  with: <This, Value>(runtime: SignalsRuntime) =>
+    state(runtime) as (
+      target: ClassAccessorDecoratorTarget<This, Value>,
+      context: ClassAccessorDecoratorContext<This, Value>,
+    ) => ClassAccessorDecoratorResult<This, Value>,
 };
 
 export function attr(attributeName?: string) {

@@ -1,4 +1,5 @@
 import { setRuntime } from "@vanishing/framework/runtime";
+
 import { solidRuntime } from "./runtime/solid-runtime.js";
 
 // Configure the global runtime

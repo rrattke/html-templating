@@ -1,5 +1,6 @@
 import { Reactive, state, Styleable } from "@vanishing/framework/wc";
 import { html } from "@vanishing/framework/template";
+
 import styles from "./data-table.css?inline";
 
 interface Person {

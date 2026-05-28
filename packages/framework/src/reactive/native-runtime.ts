@@ -1,5 +1,6 @@
-import { SignalsRuntime } from "../runtime.js";
 import { batch, createEffect, createMemo, createSignal, onCleanup, untrack } from "./signal.js";
+
+import type { SignalsRuntime } from "../runtime.js";
 
 // Define the native signal runtime
 

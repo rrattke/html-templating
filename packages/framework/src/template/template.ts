@@ -102,7 +102,7 @@ export function getTemplate(strings: readonly string[]): Template {
 function createTemplateDescriptor(strings: readonly string[]): TemplateDescriptor {
   const template = createHtmlTemplate(strings);
   const partCount = strings.length - 1;
-  const descriptors: PartDescriptor[] = new Array(partCount);
+  const descriptors: PartDescriptor[] = new Array<PartDescriptor>(partCount);
   scanTemplateContent(template.content, descriptors);
   return { template, descriptors };
 }
@@ -336,7 +336,7 @@ function extractTextContentPart(element: Element, root: DocumentFragment, descri
     const valueIndex = Number.parseInt(match[1], 10);
     indices.push(valueIndex);
     strings.push(text.slice(lastIndex, match.index));
-    lastIndex = match.index! + match[0].length;
+    lastIndex = match.index + match[0].length;
   }
   strings.push(text.slice(lastIndex));
 
@@ -389,7 +389,7 @@ function extractAttributeParts(element: Element, root: DocumentFragment, descrip
       const valueIndex = Number.parseInt(match[1], 10);
       indices.push(valueIndex);
       strings.push(value.slice(lastIndex, match.index));
-      lastIndex = match.index! + match[0].length;
+      lastIndex = match.index + match[0].length;
     }
     strings.push(value.slice(lastIndex));
 

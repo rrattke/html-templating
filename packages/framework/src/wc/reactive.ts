@@ -3,6 +3,9 @@ import type { DynamicBinding } from "../template/render.js";
 /**
  * A constructor type for classes that can be mixed with Reactive.
  */
+// Mixin constructor signature — `any[]` is the standard TS pattern; narrowing to
+// `unknown[]` breaks base-constructor compatibility checks with HTMLElement.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Constructor<T = object> = abstract new(...args: any[]) => T;
 
 /**
@@ -69,10 +72,12 @@ export function Reactive<TBase extends Constructor<HTMLElement>>(
         return;
       }
       this.#dispose?.();
-      const { fragment, dispose } = template.instance();
-      this.#dispose = dispose;
+      const instance = template.instance();
+      // `dispose` is a function-typed property on the instance, not a bound method.
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      this.#dispose = instance.dispose;
       const root = this.shadowRoot ?? this.attachShadow({ mode: "open" });
-      root.replaceChildren(fragment);
+      root.replaceChildren(instance.fragment);
     }
   }
 

@@ -1,7 +1,7 @@
 import { StaticBinding } from "@vanishing/framework/template";
 
 // Use StaticBinding.html - no runtime needed!
-const html = StaticBinding.html;
+const html = (strings: TemplateStringsArray, ...values: unknown[]): StaticBinding => StaticBinding.html(strings, ...values);
 
 // =============================================================================
 // Static Model

@@ -1,6 +1,16 @@
 import { NodeRange } from "./dom.js";
-import type { Descriptor } from "./template.js";
 import { resolvePath } from "./template.js";
+
+import type { Descriptor } from "./template.js";
+
+/**
+ * Converts an arbitrary value to its display string. Mirrors the legacy
+ * `String(value)` behaviour (objects render as `[object Object]`) but is
+ * narrowed so the type checker does not flag it as ambiguous stringification.
+ */
+function asString(value: unknown): string {
+  return String(value);
+}
 
 export type Part =
   | NodePart
@@ -32,7 +42,7 @@ class AttributeBinding implements BindingStrategy {
       element.setAttribute(name, "");
       return;
     }
-    element.setAttribute(name, String(value));
+    element.setAttribute(name, asString(value));
   }
 }
 
@@ -81,7 +91,7 @@ export class TextTemplate {
   render(): string {
     let result = this.#strings[0];
     for (let i = 0; i < this.#values.length; i++) {
-      result += String(this.#values[i] ?? "");
+      result += asString(this.#values[i] ?? "");
       result += this.#strings[i + 1];
     }
     return result;
@@ -131,7 +141,7 @@ export class NodePart {
       }
       return fragment;
     }
-    return this.#range.ownerDocument.createTextNode(String(value));
+    return this.#range.ownerDocument.createTextNode(asString(value));
   }
 }
 
@@ -283,7 +293,7 @@ export class TextContentPart {
       this.#element.textContent = this.#textTemplate.render();
       return;
     }
-    this.#element.textContent = String(value ?? "");
+    this.#element.textContent = asString(value ?? "");
   }
 }
 
