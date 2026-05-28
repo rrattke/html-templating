@@ -181,7 +181,7 @@ Use backticks for:
 
 - File names: \`package.json\`
 - Function/variable names: \`setRuntime()\`
-- CLI commands inline: \`npm run dev\`
+- CLI commands inline: \`pnpm run dev\`
 - Short code snippets: \`const x = 1\`
 
 ## Project-Specific Patterns
@@ -263,15 +263,29 @@ chore(misc): cleanup              # invented scope
 
 ## Tooling
 
+### Package manager — pnpm
+
+This repo uses **pnpm** (pinned via `packageManager` in root [package.json](package.json); install with `corepack enable`).
+Workspace layout is declared in [pnpm-workspace.yaml](pnpm-workspace.yaml) (`packages/*`, `apps/*`).
+
+- Internal workspace deps use the `workspace:` protocol: `"workspace:*"` for `*` ranges, `"workspace:^"` for caret ranges. pnpm
+  rewrites these to the real version on `pnpm publish`.
+- Native postinstall scripts (`dprint`, `unrs-resolver`) are explicitly allowed via `onlyBuiltDependencies` in `pnpm-workspace.yaml`
+  (pnpm v10+ requires opt-in).
+- Run scripts in a single workspace: `pnpm --filter <name> run <script>`. Run across all workspaces: `pnpm -r run <script>` (add
+  `--if-present` to skip workspaces that don't define the script).
+- Root orchestration still uses `npm-run-all2` (`run-s`, `run-p`) for sequential/parallel composition of root-level aggregate
+  scripts.
+
 ### Formatting — dprint
 
 `dprint` owns formatting for TS, JS, JSON, YAML, Markdown. Config lives at [dprint.json](dprint.json) — single source of truth for
-the whole repo. Run `npm run format` to auto-format and `npm run format:check` in CI.
+the whole repo. Run `pnpm run format` to auto-format and `pnpm run format:check` in CI.
 
 **Distributed per-workspace**: every workspace package owns its own `format` / `format:check` script that runs `dprint fmt "**/*"`
-scoped to its own directory (CLI args override `includes`; root config's `excludes` still apply). The root `format` script simply
-delegates via `npm run format --workspaces --if-present` — npm runs workspaces sequentially, but each workspace's own `format` is
-parallelized internally where applicable.
+scoped to its own directory (CLI args override `includes`; root config's `excludes` still apply). The root `format` script delegates
+via `pnpm -r --if-present --parallel run format` — chores have no inter-package dependencies, so all workspaces run concurrently
+(topology-free), and each workspace's own `format` is parallelized internally where applicable.
 
 ### Linting — fix-by-default
 
@@ -285,24 +299,24 @@ Two linters run in lockstep:
 
 Scripts follow the same fix-by-default / explicit-check pattern as `format`:
 
-| Script                                   | Behavior                                          |
-| ---------------------------------------- | ------------------------------------------------- |
-| `npm run lint` (= `lint:js` + `lint:md`) | Auto-fix everything fixable; report what remains  |
-| `npm run lint:check` (CI)                | No fixing; ESLint adds `--max-warnings=0`; strict |
-| `npm run lint:js` / `lint:js:check`      | ESLint only — fix or check                        |
-| `npm run lint:md` / `lint:md:check`      | markdownlint only — fix or check                  |
+| Script                                    | Behavior                                          |
+| ----------------------------------------- | ------------------------------------------------- |
+| `pnpm run lint` (= `lint:js` + `lint:md`) | Auto-fix everything fixable; report what remains  |
+| `pnpm run lint:check` (CI)                | No fixing; ESLint adds `--max-warnings=0`; strict |
+| `pnpm run lint:js` / `lint:js:check`      | ESLint only — fix or check                        |
+| `pnpm run lint:md` / `lint:md:check`      | markdownlint only — fix or check                  |
 
 **Distributed per-workspace**: every workspace package owns `lint` / `lint:check` / `lint:js[:check]` / `lint:md[:check]` scoped to
 itself. Each package's `lint` uses `run-p lint:js lint:md` (two linters in parallel). The root `lint` delegates to all workspaces
-via `npm run lint --workspaces --if-present` (sequential across workspaces, parallel within each).
+via `pnpm -r --if-present --parallel run lint` (parallel across workspaces, parallel within each).
 
-This means a single workspace can be linted/formatted in isolation (`cd packages/framework && npm run lint`) without touching the
+This means a single workspace can be linted/formatted in isolation (`cd packages/framework && pnpm run lint`) without touching the
 rest of the repo. Root-only files (root `README.md`, `AGENTS.md`, `docs/**`, configs) are not covered by these scripts — run dprint
 or markdownlint-cli2 directly from the repo root for those.
 
 ESLint severity model — correctness rules from `typescript-eslint`'s `recommended` and `recommendedTypeChecked` presets stay as
 `error` (red in editor); repo-specific style/convention nudges (imports, type-imports, unused-vars) are declared as `warn` (yellow
-in editor). ESLint is not part of the build chain, so `error` severity never blocks `npm run build` or `npm run dev`.
+in editor). ESLint is not part of the build chain, so `error` severity never blocks `pnpm run build` or `pnpm run dev`.
 
 - Typed rules (`recommendedTypeChecked`) are scoped to `**/src/**/*.ts` only — config files and specs get the untyped rule set.
 - `import-x/extensions` enforces `.js` extension on relative imports (required for ESM).

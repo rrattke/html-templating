@@ -19,7 +19,7 @@
     "lint:md:check": "markdownlint-cli2 --config ../../.markdownlint-cli2.jsonc \"**/*.md\""
   },
   "dependencies": {
-    "@vanishing/framework": "^0.1.0"
+    "@vanishing/framework": "workspace:^"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",

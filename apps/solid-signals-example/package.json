@@ -19,8 +19,8 @@
     "lint:md:check": "markdownlint-cli2 --config ../../.markdownlint-cli2.jsonc \"**/*.md\""
   },
   "dependencies": {
-    "@demo/components": "*",
-    "@vanishing/framework": "^0.1.0",
+    "@demo/components": "workspace:*",
+    "@vanishing/framework": "workspace:^",
     "solid-js": "^1.9.13"
   },
   "devDependencies": {
