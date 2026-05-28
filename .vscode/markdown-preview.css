@@ -1,0 +1,296 @@
+/* ──────────────────────────────────────────────────────────────────────
+ * VS Code Markdown preview — workspace overrides
+ *
+ * Goals:
+ *   • True black text on a soft off-white background (easier on the eyes
+ *     than VS Code's default low-contrast grey on grey).
+ *   • Comfortable reading measure (~80–90ch) centred in a wide window.
+ *   • Cleaner typography with system UI fonts and a real serif-free stack.
+ *   • Friendlier headings, code blocks, blockquotes, tables and links.
+ *
+ * Scoped to `.vscode-body` / `.markdown-body` so it applies regardless of
+ * the user's chosen VS Code theme. Selectors use high specificity (or
+ * `!important` where VS Code's built-in styles win the cascade) only when
+ * necessary.
+ * ────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --md-fg: #111418;
+  --md-fg-muted: #4a5260;
+  --md-bg: #fafaf7;
+  --md-bg-soft: #f1f1ec;
+  --md-border: #d8d8d2;
+  --md-border-soft: #e6e6e0;
+  --md-link: #0b5fff;
+  --md-link-hover: #0848c2;
+  --md-accent: #004494;
+  --md-code-fg: #1f2328;
+  --md-code-bg: #f3f3ee;
+  --md-pre-fg: #1f2328;
+  --md-pre-bg: #f7f7f2;
+  --md-pre-border: #e4e4dd;
+  --md-blockquote-fg: #4a5260;
+  --md-blockquote-bar: #c9c9c2;
+  --md-table-stripe: #f5f5f0;
+  --md-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter",
+    "Helvetica Neue", Arial, sans-serif;
+  --md-font-mono: "FiraCode Nerd Font Mono", "Fira Code", "JetBrains Mono",
+    "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* ── Page frame ───────────────────────────────────────────────────────── */
+body.vscode-body {
+  background: var(--md-bg) !important;
+}
+
+.markdown-body,
+body.vscode-body {
+  color: var(--md-fg) !important;
+  font-family: var(--md-font-sans) !important;
+  font-size: 15px;
+  line-height: 1.65;
+  font-feature-settings: "kern", "liga", "calt";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.markdown-body {
+  max-width: 980px !important;
+  margin: 0 auto !important;
+  padding: 2.5rem 3rem 4rem !important;
+}
+
+/* ── Headings ─────────────────────────────────────────────────────────── */
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  color: var(--md-fg) !important;
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  margin-top: 2.2em;
+  margin-bottom: 0.8em;
+}
+
+.markdown-body h1 {
+  font-size: 2.05em;
+  letter-spacing: -0.02em;
+  border-bottom: 1px solid var(--md-border);
+  padding-bottom: 0.35em;
+  margin-top: 0.2em;
+}
+
+.markdown-body h2 {
+  font-size: 1.55em;
+  border-bottom: 1px solid var(--md-border-soft);
+  padding-bottom: 0.3em;
+}
+
+.markdown-body h3 {
+  font-size: 1.25em;
+}
+
+.markdown-body h4 {
+  font-size: 1.08em;
+}
+
+.markdown-body h5 {
+  font-size: 0.98em;
+  color: var(--md-fg-muted) !important;
+}
+
+.markdown-body h6 {
+  font-size: 0.88em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--md-fg-muted) !important;
+}
+
+/* ── Paragraphs & lists ───────────────────────────────────────────────── */
+.markdown-body p,
+.markdown-body li {
+  color: var(--md-fg) !important;
+}
+
+.markdown-body p {
+  margin: 0 0 1em;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 1.6em;
+  margin: 0 0 1em;
+}
+
+.markdown-body li+li {
+  margin-top: 0.25em;
+}
+
+.markdown-body li>p {
+  margin: 0.5em 0;
+}
+
+/* ── Links ────────────────────────────────────────────────────────────── */
+.markdown-body a {
+  color: var(--md-link) !important;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: color 80ms ease, border-color 80ms ease;
+}
+
+.markdown-body a:hover {
+  color: var(--md-link-hover) !important;
+  border-bottom-color: currentColor;
+}
+
+/* ── Inline code ──────────────────────────────────────────────────────── */
+.markdown-body code,
+.markdown-body kbd,
+.markdown-body samp {
+  font-family: var(--md-font-mono) !important;
+  font-size: 0.88em;
+}
+
+.markdown-body :not(pre)>code {
+  color: var(--md-code-fg) !important;
+  background: var(--md-code-bg) !important;
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  border: 1px solid var(--md-border-soft);
+}
+
+.markdown-body kbd {
+  background: var(--md-bg-soft);
+  border: 1px solid var(--md-border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 0.1em 0.45em;
+  color: var(--md-fg);
+}
+
+/* ── Code blocks ──────────────────────────────────────────────────────── *
+ * Theme-aware: a soft tinted background that follows the active VS Code
+ * theme so the syntax-highlight tokens (injected as inline colors from the
+ * theme) keep their intended contrast. No hardcoded dark slab.            */
+.markdown-body pre {
+  background: var(--md-pre-bg) !important;
+  color: var(--md-pre-fg) !important;
+  border-radius: 8px;
+  padding: 1em 1.2em !important;
+  overflow: auto;
+  line-height: 1.55;
+  font-size: 0.88em;
+  border: 1px solid var(--md-pre-border);
+  box-shadow: none;
+}
+
+.markdown-body pre code {
+  background: transparent !important;
+  color: inherit !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  font-size: inherit;
+}
+
+/* ── Blockquotes ──────────────────────────────────────────────────────── */
+.markdown-body blockquote {
+  margin: 1em 0;
+  padding: 0.4em 1em;
+  color: var(--md-blockquote-fg) !important;
+  border-left: 3px solid var(--md-blockquote-bar);
+  background: var(--md-bg-soft);
+  border-radius: 0 6px 6px 0;
+}
+
+.markdown-body blockquote> :first-child {
+  margin-top: 0;
+}
+
+.markdown-body blockquote> :last-child {
+  margin-bottom: 0;
+}
+
+/* ── Tables ───────────────────────────────────────────────────────────── *
+ * Row-focused design (GitHub-style): no vertical grid lines, just a thin
+ * rule under the header and zebra-striped rows. Reads as a list of records
+ * rather than a spreadsheet grid.                                         */
+.markdown-body table {
+  border-collapse: collapse;
+  margin: 1em 0;
+  display: block;
+  overflow-x: auto;
+  font-size: 0.95em;
+  border: 0 !important;
+}
+
+.markdown-body table th,
+.markdown-body table td {
+  border: 0 !important;
+  padding: 0.5em 0.95em !important;
+  color: var(--md-fg) !important;
+}
+
+.markdown-body table thead th {
+  border-bottom: 2px solid var(--md-fg) !important;
+  font-weight: 650;
+  text-align: left;
+  background: transparent !important;
+}
+
+.markdown-body table tbody tr {
+  border-top: 0 !important;
+}
+
+.markdown-body table tbody tr:nth-child(2n) {
+  background: var(--md-table-stripe) !important;
+}
+
+/* ── Horizontal rules ─────────────────────────────────────────────────── */
+.markdown-body hr {
+  border: 0;
+  border-top: 1px solid var(--md-border);
+  margin: 2.2em 0;
+}
+
+/* ── Images ───────────────────────────────────────────────────────────── */
+.markdown-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+/* ── Dark theme adjustments ───────────────────────────────────────────── *
+ * When the user runs VS Code in a dark theme, flip to a comfortable dark
+ * palette rather than fighting it.                                        */
+body.vscode-dark {
+  --md-fg: #e6edf3;
+  --md-fg-muted: #9aa4b2;
+  --md-bg: #0f1116;
+  --md-bg-soft: #181b22;
+  --md-border: #2a2f38;
+  --md-border-soft: #20242c;
+  --md-link: #6aa6ff;
+  --md-link-hover: #93beff;
+  --md-code-fg: #e6edf3;
+  --md-code-bg: #1a1d24;
+  --md-pre-fg: #e6edf3;
+  --md-pre-bg: #161922;
+  --md-pre-border: #262b35;
+  --md-blockquote-fg: #b6bdc8;
+  --md-blockquote-bar: #3a4150;
+  --md-table-stripe: #161922;
+}
+
+body.vscode-high-contrast {
+  --md-fg: #ffffff;
+  --md-bg: #000000;
+  --md-bg-soft: #0a0a0a;
+  --md-border: #ffffff;
+  --md-border-soft: #cccccc;
+  --md-link: #4ea1ff;
+  --md-link-hover: #8fc2ff;
+}

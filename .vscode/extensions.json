@@ -1,0 +1,8 @@
+{
+  "recommendations": [
+    "editorconfig.editorconfig",
+    "dprint.dprint",
+    "dbaeumer.vscode-eslint",
+    "vitest.explorer"
+  ]
+}
