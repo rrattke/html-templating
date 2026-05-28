@@ -1,0 +1,69 @@
+{
+  "lineWidth": 132,
+  "useTabs": false,
+  "indentWidth": 2,
+  "newLineKind": "lf",
+  "includes": [
+    "**/*.md",
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.mjs",
+    "**/*.cjs",
+    "**/*.js",
+    "**/*.jsx",
+    "**/*.json",
+    "**/*.jsonc",
+    "**/*.yml",
+    "**/*.yaml"
+  ],
+  "excludes": [
+    "**/node_modules",
+    "**/bin",
+    "**/lib",
+    "**/dist",
+    "**/.vite",
+    "**/coverage",
+    "**/package-lock.json"
+  ],
+  "plugins": [
+    "https://plugins.dprint.dev/markdown-0.21.1.wasm",
+    "https://plugins.dprint.dev/typescript-0.95.15.wasm",
+    "https://plugins.dprint.dev/json-0.21.3.wasm",
+    "https://plugins.dprint.dev/g-plane/pretty_yaml-v0.6.0.wasm"
+  ],
+  "markdown": {
+    "textWrap": "always",
+    "lineWidth": 132,
+    "unorderedListKind": "dashes",
+    "emphasisKind": "asterisks",
+    "strongKind": "asterisks"
+  },
+  "typescript": {
+    "lineWidth": 132,
+    "indentWidth": 2,
+    "quoteStyle": "alwaysDouble",
+    "quoteProps": "asNeeded",
+    "semiColons": "always",
+    "trailingCommas": "onlyMultiLine",
+    "useBraces": "always",
+    "bracePosition": "sameLine",
+    "preferHanging": false,
+    "preferSingleLine": false,
+    "arrowFunction.useParentheses": "force",
+    "jsx.quoteStyle": "preferDouble",
+    "jsx.bracketPosition": "nextLine",
+    "jsx.multiLineParens": "prefer",
+    "module.sortImportDeclarations": "maintain",
+    "module.sortExportDeclarations": "maintain"
+  },
+  "json": {
+    "lineWidth": 132,
+    "indentWidth": 2,
+    "trailingCommas": "never"
+  },
+  "yaml": {
+    "printWidth": 132,
+    "indentWidth": 2,
+    "quotes": "preferDouble"
+  }
+}
