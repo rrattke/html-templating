@@ -28,12 +28,12 @@
     "start:static": "run-s build:lib:framework build:app:static && npm run preview -w static-example",
     "test": "npm test --workspaces --if-present",
     "clean": "npm run clean --workspaces --if-present",
-    "lint:ts": "eslint .",
-    "lint:ts:check": "eslint . --max-warnings=0",
-    "lint:ts:fix": "eslint . --fix",
+    "lint": "eslint .",
+    "lint:check": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix",
     "format": "dprint fmt",
     "format:check": "dprint check",
-    "check": "run-s format:check lint:ts:check test"
+    "check": "run-s format:check lint:check test"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.0",

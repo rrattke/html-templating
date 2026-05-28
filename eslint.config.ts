@@ -2,8 +2,8 @@
 // ESLint flat config — uniform `warn` severity.
 //
 // Workflow:
-//   * Editor + `npm run lint:ts`  → warnings only, never blocks dev work.
-//   * `npm run lint:ts:check` (CI) → adds `--max-warnings=0`, every warning
+//   * Editor + `npm run lint`        → warnings only, never blocks dev work.
+//   * `npm run lint:check` (CI)       → adds `--max-warnings=0`, every warning
 //                                    becomes a build failure.
 //
 // Rule severity is therefore a single bit at the *script* level, not a

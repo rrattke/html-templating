@@ -271,7 +271,7 @@ auto-format and `npm run format:check` in CI.
 ### Linting — ESLint flat config (warn-only)
 
 [eslint.config.ts](eslint.config.ts) declares every rule as `warn`, including upstream `error` rules (downgraded programmatically).
-The CI script `lint:ts:check` adds `--max-warnings=0` so warnings still gate merges, but local dev work is never blocked.
+The CI script `lint:check` adds `--max-warnings=0` so warnings still gate merges, but local dev work is never blocked.
 
 - Typed rules (`recommendedTypeChecked`) are scoped to `**/src/**/*.ts` only — config files and specs get the untyped rule set.
 - `import-x/extensions` enforces `.js` extension on relative imports (required for ESM).
